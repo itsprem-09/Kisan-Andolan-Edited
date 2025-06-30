@@ -1,0 +1,242 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Primary Colors */
+    --color-primary: #00712d; /* Deep forest green - green-800 */
+    --color-secondary: #4a7c59; /* Balanced mid-tone green - green-700 */
+    --color-accent: #8fbc8f; /* Light green - green-300 */
+    
+    /* Background Colors */
+    --color-background: #ecffe6; /* Soft green tint - green-50 */
+    --color-surface: #ffffff; /* Pure white - white */
+    
+    /* Text Colors */
+    --color-text-primary: #1a1a1a; /* Near black - gray-900 */
+    --color-text-secondary: #666666; /* Medium gray - gray-600 */
+    
+    /* Status Colors */
+    --color-success: #22c55e; /* Vibrant green - green-500 */
+    --color-warning: #f59e0b; /* Warm amber - amber-500 */
+    --color-error: #ef4444; /* Clear red - red-500 */
+    
+    /* Border Colors */
+    --color-border: #e5e7eb; /* Light gray - gray-200 */
+    --color-border-focus: #00712d; /* Primary green for focus states - green-800 */
+    
+    /* Shadow Colors */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-base: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+  scroll-behavior: smooth;
+}
+
+  body {
+    @apply bg-background text-text-primary font-body;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-accent rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-secondary;
+  }
+
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Button Components */
+  .btn-primary {
+    @apply bg-primary text-white px-6 py-3 rounded-md font-medium transition-all duration-200 hover:bg-secondary focus:ring-2 focus:ring-primary focus:ring-offset-2 active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-white px-6 py-3 rounded-md font-medium transition-all duration-200 hover:bg-primary focus:ring-2 focus:ring-secondary focus:ring-offset-2 active:scale-95;
+  }
+
+  .btn-outline {
+    @apply border-2 border-primary text-primary px-6 py-3 rounded-md font-medium transition-all duration-200 hover:bg-primary hover:text-white focus:ring-2 focus:ring-primary focus:ring-offset-2 active:scale-95;
+  }
+
+  /* Form Components */
+  .form-input {
+    @apply w-full px-4 py-3 border border-border rounded-md bg-surface text-text-primary placeholder-text-secondary transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-1;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-text-primary mb-2 font-caption;
+  }
+
+  /* Card Components */
+  .card {
+    @apply bg-surface rounded-lg shadow-base border border-border p-6 transition-all duration-200 hover:shadow-md;
+  }
+
+  .card-elevated {
+    @apply bg-surface rounded-lg shadow-lg border border-border p-6 transition-all duration-200 hover:shadow-xl;
+  }
+
+  /* Navigation Components */
+  .nav-link {
+    @apply text-text-primary font-medium transition-all duration-200 hover:text-primary focus:text-primary focus:outline-none;
+  }
+
+  .nav-link-active {
+    @apply text-primary font-semibold;
+  }
+
+  /* Modal Components */
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 transition-opacity duration-300;
+  }
+
+  .sticky-modal {
+    @apply fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 transition-opacity duration-300 overflow-y-auto;
+  }
+
+  .modal-content {
+    @apply bg-surface rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all duration-300 scale-100;
+  }
+
+  /* Animation Classes */
+  .animate-fade-in {
+    animation: fadeIn 300ms ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 300ms ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 200ms ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Skeleton Loading */
+  .skeleton {
+    @apply bg-accent animate-pulse rounded;
+  }
+
+  .skeleton-wave {
+    background: linear-gradient(90deg, var(--color-accent) 25%, var(--color-background) 50%, var(--color-accent) 75%);
+    background-size: 200% 100%;
+    animation: wave 2s infinite;
+  }
+
+  @keyframes wave {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}
+
+@layer utilities {
+  /* Custom spacing utilities */
+  .space-y-16 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 4rem;
+  }
+
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Container utilities */
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Transition utilities */
+  .transition-smooth {
+    transition: all 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .transition-layout {
+    transition: all 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  /* Touch target utilities */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Accessibility utilities */
+  .sr-only-focusable:focus {
+    @apply not-sr-only;
+  }
+}

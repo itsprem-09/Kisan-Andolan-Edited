@@ -1,0 +1,8 @@
+# Server-specific ignores
+# Add any server-specific files or directories that should be ignored by Git
+
+# Example: if you have local log files specific to the server
+# *.local.log
+/node_modules
+
+.env
