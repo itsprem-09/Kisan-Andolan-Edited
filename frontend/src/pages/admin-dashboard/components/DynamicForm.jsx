@@ -265,16 +265,31 @@ const DynamicForm = ({ fields = [], initialData, onSubmit, onCancel, isLoading, 
         return; // Early return since we've already set formData
       }
     } else if (name === 'uploadType') {
-      // Handle switch between Video Link and Upload File
+      // Handle switch between None, Video Link and Upload File
       console.log(`Upload type changed to: ${value}`);
 
       // Force an immediate state update for uploadType to ensure it's captured
       const updatedFormData = {
         ...formData,
         [name]: value,
-        // Clear videoLink if switching to Upload File
-        ...(value === 'Upload File' ? { videoLink: '' } : {})
       };
+      
+      // Clear fields based on selection
+      if (value === 'Upload File') {
+        // Clear videoLink if switching to Upload File
+        updatedFormData.videoLink = '';
+        console.log('Cleared videoLink for Upload File');
+      } else if (value === 'Video Link') {
+        // Clear video file if switching to Video Link
+        updatedFormData.video = null;
+        console.log('Cleared video file for Video Link');
+      } else if (value === 'None') {
+        // Clear both video and videoLink if choosing None
+        updatedFormData.video = null;
+        updatedFormData.videoLink = '';
+        updatedFormData.videoUrl = '';
+        console.log('Cleared all video fields for None option');
+      }
 
       setFormData(updatedFormData);
       console.log('Updated form data after uploadType change:', updatedFormData);
@@ -289,19 +304,41 @@ const DynamicForm = ({ fields = [], initialData, onSubmit, onCancel, isLoading, 
         const selectedFiles = Array.from(files);
         console.log(`Multiple files selected for ${name}:`, selectedFiles.map(f => f.name));
 
+        // Store selected files in the accumulator
+        if (!filesAccumulator.current[name]) {
+          filesAccumulator.current[name] = [];
+        }
+        
+        // Add new files to the accumulator
+        filesAccumulator.current[name] = [...filesAccumulator.current[name], ...selectedFiles];
+        
+        // Update form data with all accumulated files
         setFormData(prev => ({
-          ...prev,
-          [name]: selectedFiles
+          ...prev, // Keep all other form fields intact
+          [name]: filesAccumulator.current[name]
         }));
 
-        const previewsObj = {};
+        // Create preview URLs for new files
+        const newPreviewsObj = {};
         selectedFiles.forEach(file => {
-          previewsObj[file.name] = URL.createObjectURL(file);
+          newPreviewsObj[file.name] = URL.createObjectURL(file);
         });
 
+        // Update multiple files state for gallery display
+        setMultipleFiles(prev => {
+          const existingFiles = prev[name] || [];
+          const newFileUrls = Object.values(newPreviewsObj);
+          
+          return {
+            ...prev,
+            [name]: [...existingFiles, ...newFileUrls]
+          };
+        });
+        
+        // Update previews state
         setPreviews(prev => ({
           ...prev,
-          ...previewsObj
+          ...newPreviewsObj
         }));
       } else {
         // Handle single file
@@ -322,7 +359,7 @@ const DynamicForm = ({ fields = [], initialData, onSubmit, onCancel, isLoading, 
             }
           }
 
-          // Update form data with the file
+          // Update form data with the file, preserving other fields
           setFormData(prev => ({ ...prev, [name]: file }));
 
           // Create and set a preview URL
@@ -565,9 +602,23 @@ const DynamicForm = ({ fields = [], initialData, onSubmit, onCancel, isLoading, 
             [field.name]: newValue
           };
 
-          // If changing to Upload File, clear videoLink
-          if (field.name === 'uploadType' && newValue === 'Upload File') {
-            updatedData.videoLink = '';
+          // Handle different upload type options
+          if (field.name === 'uploadType') {
+            if (newValue === 'Upload File') {
+              // If changing to Upload File, clear videoLink
+              updatedData.videoLink = '';
+              console.log('Cleared videoLink for Upload File');
+            } else if (newValue === 'Video Link') {
+              // If changing to Video Link, clear video file
+              updatedData.video = null;
+              console.log('Cleared video file for Video Link');
+            } else if (newValue === 'None') {
+              // If changing to None, clear both video and videoLink
+              updatedData.video = null;
+              updatedData.videoLink = '';
+              updatedData.videoUrl = '';
+              console.log('Cleared all video fields for None option');
+            }
           }
 
           setFormData(updatedData);
@@ -596,13 +647,13 @@ const DynamicForm = ({ fields = [], initialData, onSubmit, onCancel, isLoading, 
         console.log(`Options for ${field.name}:`, field.options);
 
         // For video media types, ensure uploadType is explicitly set 
-        if (field.name === 'uploadType' && !formData[field.name] &&
-          (formData.type === 'Documentary' || formData.type === 'Video Series')) {
-          // Set a default value
+        if (field.name === 'uploadType' && !formData[field.name]) {
+          // Set a default value based on the field's options
           setTimeout(() => {
+            const defaultOption = field.options && field.options.length > 0 ? field.options[0] : 'None';
             setFormData(prev => ({
               ...prev,
-              uploadType: 'Upload File'
+              uploadType: defaultOption
             }));
           }, 0);
         }
@@ -644,6 +695,33 @@ const DynamicForm = ({ fields = [], initialData, onSubmit, onCancel, isLoading, 
               type="file"
               accept="image/*"
               multiple
+              onChange={(e) => {
+                // Prevent form reset by handling file selection directly
+                const selectedFiles = Array.from(e.target.files || []);
+                if (selectedFiles.length === 0) return;
+                
+                console.log(`Files selected for ${field.name}:`, selectedFiles.map(f => f.name));
+                
+                // Add to accumulator
+                filesAccumulator.current[field.name] = selectedFiles;
+                
+                // Update form data
+                setFormData(prev => ({
+                  ...prev,
+                  [field.name]: selectedFiles
+                }));
+                
+                // Create previews
+                const newUrls = selectedFiles.map(file => URL.createObjectURL(file));
+                
+                // Update multiple files display
+                setMultipleFiles(prev => ({
+                  ...prev,
+                  [field.name]: newUrls
+                }));
+                
+                // Don't clear the input here as it's the main input
+              }}
             />
 
             {/* Show selected gallery images */}
@@ -692,7 +770,37 @@ const DynamicForm = ({ fields = [], initialData, onSubmit, onCancel, isLoading, 
                       type="file"
                       accept="image/*"
                       multiple
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        // Prevent form reset by handling file selection directly
+                        const selectedFiles = Array.from(e.target.files || []);
+                        if (selectedFiles.length === 0) return;
+                        
+                        console.log(`Additional files selected for ${field.name}:`, selectedFiles.map(f => f.name));
+                        
+                        // Add to accumulator
+                        if (!filesAccumulator.current[field.name]) {
+                          filesAccumulator.current[field.name] = [];
+                        }
+                        filesAccumulator.current[field.name] = [...filesAccumulator.current[field.name], ...selectedFiles];
+                        
+                        // Update form data
+                        setFormData(prev => ({
+                          ...prev,
+                          [field.name]: filesAccumulator.current[field.name]
+                        }));
+                        
+                        // Create previews
+                        const newUrls = selectedFiles.map(file => URL.createObjectURL(file));
+                        
+                        // Update multiple files display
+                        setMultipleFiles(prev => ({
+                          ...prev,
+                          [field.name]: [...(prev[field.name] || []), ...newUrls]
+                        }));
+                        
+                        // Clear the input to allow selecting the same files again
+                        e.target.value = '';
+                      }}
                       className="hidden"
                     />
                   </div>

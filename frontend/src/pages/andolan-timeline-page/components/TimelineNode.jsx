@@ -6,7 +6,7 @@ import TranslateText from 'components/TranslateText';
 
 const TimelineNode = ({ year, isSelected, isKeyMilestone, onClick, index, count = 1, currentIndex = null }) => {
   const hasMultiple = count > 1;
-  const { language } = useLanguage();
+  const { language, getTranslation } = useLanguage();
 
   return (
     <div className="relative">
@@ -65,9 +65,7 @@ const TimelineNode = ({ year, isSelected, isKeyMilestone, onClick, index, count 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <TranslateText 
-                hindiText={`${currentIndex}/${count} घटनाएँ`}
-              >{currentIndex}/{count} Events</TranslateText>
+              {getTranslation('eventCount', { current: currentIndex, total: count })}
             </motion.div>
           )}
         </div>
@@ -129,7 +127,7 @@ const TimelineNode = ({ year, isSelected, isKeyMilestone, onClick, index, count 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <TranslateText hindiText={`${currentIndex}/${count}`}>{currentIndex}/{count}</TranslateText>
+            {getTranslation('eventCount', { current: currentIndex, total: count })}
           </motion.div>
         )}
       </div>

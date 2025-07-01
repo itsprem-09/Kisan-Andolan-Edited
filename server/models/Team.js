@@ -5,11 +5,23 @@ const teamMemberSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Team member name is required']
   },
+  hindi_name: {
+    type: String,
+    default: ''
+  },
   role: {
     type: String,
     required: [true, 'Role is required']
   },
+  hindi_role: {
+    type: String,
+    default: ''
+  },
   description: {
+    type: String,
+    default: ''
+  },
+  hindi_description: {
     type: String,
     default: ''
   },
@@ -32,6 +44,14 @@ const teamMemberSchema = new mongoose.Schema({
   category: {
     type: String,
     default: 'Core Team'
+  },
+  region: {
+    type: String,
+    default: 'National'
+  },
+  isFounder: {
+    type: Boolean,
+    default: false
   },
   displayOrder: {
     type: Number,

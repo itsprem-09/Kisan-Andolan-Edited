@@ -1,8 +1,17 @@
 import React from 'react';
 import Icon from 'components/AppIcon';
 import Image from 'components/AppImage';
+import TranslateText from 'components/TranslateText';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 const TeamMemberCard = ({ member, onClick }) => {
+  const { language } = useLanguage();
+  
+  // Use Hindi content if available and language is Hindi
+  const displayName = language === 'hi' && member.hindi_name ? member.hindi_name : member.name;
+  const displayRole = language === 'hi' && member.hindi_role ? member.hindi_role : member.role;
+  const displayDescription = language === 'hi' && member.hindi_description ? member.hindi_description : member.description;
+
   return (
     <div
       onClick={() => onClick(member)}
@@ -13,7 +22,7 @@ const TeamMemberCard = ({ member, onClick }) => {
         <div className="w-full h-72 overflow-hidden bg-gray-100">
           <Image
             src={member.photo}
-            alt={member.name}
+            alt={displayName}
             className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
           />
         </div>
@@ -23,21 +32,23 @@ const TeamMemberCard = ({ member, onClick }) => {
       <div className="p-6 bg-white border-t-4 border-primary space-y-3">
         <div>
           <h3 className="text-xl font-heading font-bold text-primary group-hover:text-secondary transition-colors">
-            {member.name}
+            {displayName}
           </h3>
           <p className="text-secondary font-medium text-base mt-1">
-            {member.role}
+            {displayRole}
           </p>
         </div>
 
         <p className="text-text-secondary text-sm font-body line-clamp-3">
-          {member.description}
+          {displayDescription}
         </p>
 
         {/* View Profile Link */}
         <div className="flex items-center justify-end pt-3 border-t border-border">
           <div className="flex items-center text-text-secondary group-hover:text-primary transition-colors">
-            <span className="text-xs font-caption mr-1">View Profile</span>
+            <span className="text-xs font-caption mr-1">
+              <TranslateText translationKey="viewProfile">View Profile</TranslateText>
+            </span>
             <Icon name="ChevronRight" size={14} />
           </div>
         </div>

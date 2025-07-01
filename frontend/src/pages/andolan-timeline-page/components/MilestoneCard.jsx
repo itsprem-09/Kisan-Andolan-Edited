@@ -23,7 +23,8 @@ const MilestoneCard = ({
   item,
   onPrevious,
   onNext,
-  compact
+  compact,
+  onClick
 }) => {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -89,7 +90,10 @@ const MilestoneCard = ({
 
   if (compact) {
     return (
-      <div className="bg-surface rounded-lg shadow-md p-6 hover:shadow-lg transition-all">
+      <div 
+        className="bg-surface rounded-lg shadow-md p-6 hover:shadow-lg transition-all cursor-pointer hover:bg-gray-50"
+        onClick={onClick}
+      >
         <div className="mb-4">
           <span className="inline-block bg-primary text-white px-3 py-1 rounded-full text-sm font-medium">
             {finalDate}
@@ -114,6 +118,12 @@ const MilestoneCard = ({
               {finalCategory}
             </span>
           )}
+          <div className="text-primary hover:text-primary-dark">
+            <span className="text-sm flex items-center">
+              <span className="mr-1">{getTranslation('readMore')}</span>
+              <Icon name="ArrowRight" size={14} />
+            </span>
+          </div>
         </div>
       </div>
     );

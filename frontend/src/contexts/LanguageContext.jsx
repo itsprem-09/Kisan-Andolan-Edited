@@ -85,6 +85,25 @@ const translations = {
     projects: 'Projects',
     youthLeadershipProgram: 'Youth Leadership Program',
     
+    // Added vision, mission, and political mission content arrays
+    visionContent: [
+      'To create a sustainable and prosperous agricultural ecosystem in India where farmers receive fair compensation for their produce.',
+      'To ensure that every farming family has access to modern agricultural technology, resources, and knowledge.',
+      'To transform rural communities into centers of innovation, economic growth, and social development.'
+    ],
+    missionContent: [
+      'Advocating for farmer-friendly policies at local, state, and national levels.',
+      'Providing education and training programs to help farmers adopt sustainable and profitable practices.',
+      'Building strong market linkages that eliminate exploitative middlemen and ensure fair prices.',
+      'Creating cooperative structures that empower farmers to collectively negotiate and access resources.'
+    ],
+    politicalMissionContent: [
+      'To establish a political voice that genuinely represents the interests of India\'s farming communities.',
+      'To ensure agricultural issues are prioritized in policy-making processes across all levels of government.',
+      'To promote leaders who understand rural challenges and are committed to sustainable agricultural development.',
+      'To advance constitutional values of equality, justice, and dignity for all agricultural workers.'
+    ],
+    
     // Information Center
     informationCenterTitle: 'Information Center',
     informationCenterDesc: 'Access comprehensive agricultural resources, government schemes, and educational content to enhance your farming knowledge and productivity.',
@@ -204,6 +223,8 @@ const translations = {
     image: 'Image',
     images: 'Images',
     more: 'More',
+    achievement: 'Achievement',
+    close: 'Close',
     viewAllImages: 'View All {count} Images',
     milestone: 'Milestone',
     milestones: 'Milestones',
@@ -224,7 +245,28 @@ const translations = {
     jumpToDecade: 'Jump to Decade',
     
     // Team and Leadership
-    leadership: 'Leadership'
+    leadership: 'Leadership',
+    
+    // Team Leadership Page
+    teamAndLeadership: 'Team & Leadership',
+    teamLeadershipDesc: 'Meet the dedicated leaders and team members who are driving the Rashtriya Kishan Manch forward, working tirelessly to empower farmers and transform agricultural communities across India.',
+    searchTeamMembers: 'Search Team Members',
+    searchPlaceholderTeam: 'Search by name, role, or description...',
+    showingFilteredResults: 'Showing filtered results for',
+    showingAllTeamMembers: 'Showing all team members',
+    ourTeamTitle: 'Our Team',
+    ourTeamDesc: 'Our diverse team brings together expertise from various fields to create comprehensive solutions for the agricultural community.',
+    loadingTeamMembers: 'Loading team members...',
+    noTeamMembersFound: 'No team members found matching your search.',
+    tryAgain: 'Try Again',
+    viewProfile: 'View Profile',
+    about: 'About',
+    contactInformation: 'Contact Information',
+    region: 'Region',
+    category: 'Category',
+    socialProfiles: 'Social Profiles',
+    founderInfo: 'Founder',
+    clearSearch: 'Clear'
   },
   hi: {
     // Navigation
@@ -244,9 +286,28 @@ const translations = {
     search: 'खोज',
     filter: 'फ़िल्टर',
     
+    // Added vision, mission, and political mission content arrays for Hindi
+    visionContent: [
+      'भारत में एक स्थायी और समृद्ध कृषि पारिस्थितिकी तंत्र बनाना जहां किसानों को अपनी उपज के लिए उचित मुआवजा मिले।',
+      'यह सुनिश्चित करना कि हर किसान परिवार को आधुनिक कृषि प्रौद्योगिकी, संसाधनों और ज्ञान तक पहुंच हो।',
+      'ग्रामीण समुदायों को नवाचार, आर्थिक विकास और सामाजिक विकास के केंद्रों में बदलना।'
+    ],
+    missionContent: [
+      'स्थानीय, राज्य और राष्ट्रीय स्तर पर किसान-अनुकूल नीतियों की वकालत करना।',
+      'किसानों को स्थायी और लाभदायक प्रथाओं को अपनाने में मदद करने के लिए शिक्षा और प्रशिक्षण कार्यक्रम प्रदान करना।',
+      'मजबूत बाजार संबंध बनाना जो शोषणकारी बिचौलियों को समाप्त करें और उचित कीमतों को सुनिश्चित करें।',
+      'सहकारी संरचनाएं बनाना जो किसानों को सामूहिक रूप से बातचीत करने और संसाधनों तक पहुंचने के लिए सशक्त बनाती हैं।'
+    ],
+    politicalMissionContent: [
+      'एक राजनीतिक आवाज स्थापित करना जो वास्तव में भारत के किसान समुदायों के हितों का प्रतिनिधित्व करती है।',
+      'यह सुनिश्चित करना कि सरकार के सभी स्तरों पर नीति-निर्माण प्रक्रियाओं में कृषि मुद्दों को प्राथमिकता दी जाए।',
+      'ऐसे नेताओं को बढ़ावा देना जो ग्रामीण चुनौतियों को समझते हैं और स्थायी कृषि विकास के प्रति प्रतिबद्ध हैं।',
+      'सभी कृषि श्रमिकों के लिए समानता, न्याय और गरिमा के संवैधानिक मूल्यों को आगे बढ़ाना।'
+    ],
+    
     // Timeline Page
     timelineTitle: 'आंदोलन की समयरेखा',
-    timelineDesc: 'किसान आंदोलन के इतिहास और विकास को प्रमुख घटनाओं, मील के पत्थरों और उपलब्धियों के माध्यम से जानें।',
+    timelineDesc: 'हमारे आंदोलन की यात्रा और विकास को महत्वपूर्ण घटनाओं, मील के पत्थरों और उपलब्धियों के माध्यम से देखें जिन्होंने किसान आंदोलन को आकार दिया है।',
     timelineView: 'समयरेखा दृश्य',
     decadeView: 'दशक दृश्य',
     filterByCategory: 'श्रेणी द्वारा फ़िल्टर करें',
@@ -261,6 +322,8 @@ const translations = {
     image: 'छवि',
     images: 'छवियाँ',
     more: 'अधिक',
+    achievement: 'उपलब्धि',
+    close: 'बंद करें',
     viewAllImages: 'सभी {count} छवियां देखें',
     milestone: 'मील का पत्थर',
     milestones: 'मील के पत्थर',
@@ -278,20 +341,44 @@ const translations = {
     noDecadesMatchFilters: 'आपके वर्तमान फ़िल्टर मापदंड से कोई दशक मेल नहीं खाता',
     resetAllFilters: 'सभी फ़िल्टर रीसेट करें',
     noDataForFilters: 'वर्तमान फ़िल्टर के साथ कोई डेटा उपलब्ध नहीं है',
-    jumpToDecade: 'दशक पर जाएं'
+    jumpToDecade: 'दशक पर जाएं',
+    
+    // Team and Leadership
+    leadership: 'नेतृत्व',
+    
+    // Team Leadership Page
+    teamAndLeadership: 'टीम और नेतृत्व',
+    teamLeadershipDesc: 'उन समर्पित नेताओं और टीम सदस्यों से मिलें जो राष्ट्रीय किसान मंच को आगे बढ़ा रहे हैं, किसानों को सशक्त बनाने और भारत भर के कृषि समुदायों को बदलने के लिए अथक प्रयास कर रहे हैं।',
+    searchTeamMembers: 'टीम के सदस्यों को खोजें',
+    searchPlaceholderTeam: 'नाम, भूमिका, या विवरण से खोजें...',
+    showingFilteredResults: 'के लिए फ़िल्टर किए गए परिणाम दिखा रहे हैं',
+    showingAllTeamMembers: 'सभी टीम सदस्यों को दिखा रहे हैं',
+    ourTeamTitle: 'हमारी टीम',
+    ourTeamDesc: 'हमारी विविध टीम कृषि समुदाय के लिए व्यापक समाधान बनाने के लिए विभिन्न क्षेत्रों से विशेषज्ञता को एक साथ लाती है।',
+    loadingTeamMembers: 'टीम के सदस्यों को लोड कर रहे हैं...',
+    noTeamMembersFound: 'आपकी खोज से मेल खाने वाले कोई टीम सदस्य नहीं मिले।',
+    tryAgain: 'पुनः प्रयास करें',
+    viewProfile: 'प्रोफ़ाइल देखें',
+    about: 'परिचय',
+    contactInformation: 'संपर्क जानकारी',
+    region: 'क्षेत्र',
+    category: 'श्रेणी',
+    socialProfiles: 'सोशल प्रोफाइल',
+    founderInfo: 'संस्थापक',
+    clearSearch: 'साफ़ करें'
   }
 };
 
 export const LanguageProvider = ({ children }) => {
-  const [language, setLanguage] = useState('en');
+  const [language, setLanguage] = useState('hi');
   
   // Initialize language from localStorage if available
   useEffect(() => {
-    const savedLang = localStorage.getItem('selectedLang') || 'en';
+    const savedLang = localStorage.getItem('selectedLang') || 'hi';
     setLanguage(savedLang);
     
-    // If saved language is not English, translate dynamic content
-    if (savedLang !== 'en') {
+    // Translate dynamic content if the language is Hindi
+    if (savedLang === 'hi') {
       translateDynamicContent(savedLang);
     }
   }, []);
@@ -304,6 +391,9 @@ export const LanguageProvider = ({ children }) => {
     
     // Translate dynamic content using Google Translate API
     translateDynamicContent(newLang);
+    
+    // Ensure we don't trigger a page refresh
+    return false;
   };
   
   // Function to translate dynamic content using Google Translate API
@@ -356,8 +446,17 @@ export const LanguageProvider = ({ children }) => {
   };
   
   // Get translation for a specific key
-  const getTranslation = (key) => {
-    return translations[language]?.[key] || translations['en'][key] || key;
+  const getTranslation = (key, params) => {
+    const translation = translations[language]?.[key] || translations['en'][key] || key;
+    
+    // If params are provided, replace placeholders in the translation
+    if (params && typeof params === 'object') {
+      return Object.entries(params).reduce((str, [param, value]) => {
+        return str.replace(new RegExp(`{${param}}`, 'g'), value);
+      }, translation);
+    }
+    
+    return translation;
   };
 
   return (

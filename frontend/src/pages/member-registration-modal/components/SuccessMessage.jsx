@@ -1,11 +1,72 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Icon from 'components/AppIcon';
 import TranslateText from 'components/TranslateText';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import memberService from 'services/memberService';
 
 const SuccessMessage = ({ memberData, onClose }) => {
   const { language } = useLanguage();
-  const membershipId = memberData?.membershipId || 'RKM-' + Math.floor(Math.random() * 900000 + 100000);
+  const [downloadStatus, setDownloadStatus] = useState('pending');
+  const [downloadError, setDownloadError] = useState(null);
+
+  const membershipId = memberData?.membershipId || memberData?.applicationId || 'RKM-' + Math.floor(Math.random() * 900000 + 100000);
+  
+  // Use member data or fallback to localStorage
+  const name = memberData?.name || localStorage.getItem('member_name') || 'Member';
+  const village = memberData?.village || localStorage.getItem('member_village') || 'Not provided';
+  const phoneNumber = memberData?.phoneNumber || localStorage.getItem('member_phone') || '0000000000';
+
+  // Clean up localStorage and download PDF
+  useEffect(() => {
+    // Auto-download PDF receipt
+    const downloadReceipt = async () => {
+      try {
+        setDownloadStatus('downloading');
+        await memberService.downloadApplicationReceipt({
+          ...memberData,
+          name,
+          village,
+          phoneNumber,
+          applicationId: membershipId,
+          membershipType: 'General Member'
+        });
+        setDownloadStatus('completed');
+      } catch (error) {
+        console.error('Error downloading application receipt:', error);
+        setDownloadStatus('failed');
+        setDownloadError(error.message || 'Failed to download receipt');
+      }
+    };
+
+    downloadReceipt();
+
+    return () => {
+      // Clean up localStorage when component unmounts
+      localStorage.removeItem('member_name');
+      localStorage.removeItem('member_village');
+      localStorage.removeItem('member_phone');
+    };
+  }, []);
+
+  const handleDownloadApplication = async () => {
+    try {
+      setDownloadStatus('downloading');
+      await memberService.downloadApplicationReceipt({
+        ...memberData,
+        name,
+        village,
+        phoneNumber,
+        applicationId: membershipId,
+        membershipType: 'General Member'
+      });
+      setDownloadStatus('completed');
+      setDownloadError(null);
+    } catch (error) {
+      console.error('Error downloading application receipt:', error);
+      setDownloadStatus('failed');
+      setDownloadError(error.message || 'Failed to download receipt');
+    }
+  };
 
   return (
     <div className="text-center space-y-8">
@@ -55,6 +116,32 @@ const SuccessMessage = ({ memberData, onClose }) => {
           </div>
         </div>
       </div>
+      
+      {/* Download Status */}
+      {downloadStatus === 'downloading' && (
+        <div className="flex items-center justify-center space-x-2 text-text-secondary">
+          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary"></div>
+          <span>
+            <TranslateText translationKey="downloadingReceipt">Downloading your application receipt...</TranslateText>
+          </span>
+        </div>
+      )}
+
+      {downloadStatus === 'completed' && (
+        <div className="flex items-center justify-center space-x-2 text-success">
+          <Icon name="CheckCircle" size={16} />
+          <span>
+            <TranslateText translationKey="receiptDownloaded">Application receipt downloaded successfully!</TranslateText>
+          </span>
+        </div>
+      )}
+
+      {downloadStatus === 'failed' && (
+        <div className="flex items-center justify-center space-x-2 text-error">
+          <Icon name="AlertCircle" size={16} />
+          <span>{downloadError || <TranslateText translationKey="downloadFailed">Failed to download receipt. Please try again.</TranslateText>}</span>
+        </div>
+      )}
       
       {/* What Happens Next */}
       <div className="max-w-md mx-auto pt-4">
@@ -109,8 +196,33 @@ const SuccessMessage = ({ memberData, onClose }) => {
         </div>
       </div>
       
+      {/* Download Again Button */}
+      <div className="pt-2">
+        <button
+          onClick={handleDownloadApplication}
+          className={`btn-outline mb-4 ${
+            downloadStatus === 'downloading' 
+              ? 'opacity-50 cursor-not-allowed' 
+              : ''
+          }`}
+          disabled={downloadStatus === 'downloading'}
+        >
+          {downloadStatus === 'downloading' ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary mr-2"></div>
+              <TranslateText translationKey="downloading">Downloading...</TranslateText>
+            </>
+          ) : (
+            <>
+              <Icon name="Download" size={18} className="mr-2" />
+              <TranslateText translationKey="downloadApplication">Download Application</TranslateText>
+            </>
+          )}
+        </button>
+      </div>
+      
       {/* Return Button */}
-      <div className="pt-6">
+      <div>
         <button
           onClick={onClose}
           className="btn-primary px-8 py-3"

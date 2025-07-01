@@ -27,7 +27,19 @@ const getTeamMemberById = asyncHandler(async (req, res) => {
 // @route   POST /api/team
 // @access  Private/Admin
 const createTeamMember = asyncHandler(async (req, res) => {
-  const { name, role, description, email, phone } = req.body;
+  const { 
+    name, 
+    hindi_name,
+    role, 
+    hindi_role,
+    description, 
+    hindi_description,
+    email, 
+    phone,
+    category,
+    region,
+    isFounder
+  } = req.body;
 
   if (!req.file) {
     res.status(400);
@@ -38,10 +50,16 @@ const createTeamMember = asyncHandler(async (req, res) => {
 
   const teamMember = new Team({
     name,
+    hindi_name: hindi_name || '',
     role,
+    hindi_role: hindi_role || '',
     description,
+    hindi_description: hindi_description || '',
     email,
     phone,
+    category,
+    region,
+    isFounder: isFounder === 'true' || isFounder === true,
     photo: photoUrl,
     photoPublicId: photoPublicIdVal,
   });
@@ -54,7 +72,22 @@ const createTeamMember = asyncHandler(async (req, res) => {
 // @route   PUT /api/team/:id
 // @access  Private/Admin
 const updateTeamMember = asyncHandler(async (req, res) => {
-  const { name, role, description, email, phone } = req.body;
+  const { 
+    name, 
+    hindi_name,
+    role, 
+    hindi_role,
+    bio, 
+    description,
+    hindi_description,
+    email, 
+    phone,
+    category,
+    region,
+    isFounder,
+    socialMedia 
+  } = req.body;
+  
   const teamMember = await Team.findById(req.params.id);
 
   if (!teamMember) {
@@ -76,10 +109,54 @@ const updateTeamMember = asyncHandler(async (req, res) => {
   }
 
   teamMember.name = name || teamMember.name;
+  teamMember.hindi_name = hindi_name !== undefined ? hindi_name : teamMember.hindi_name;
   teamMember.role = role || teamMember.role;
-  teamMember.description = description || teamMember.description;
+  teamMember.hindi_role = hindi_role !== undefined ? hindi_role : teamMember.hindi_role;
+  
+  // Handle description/bio (bio field from form maps to description in DB)
+  teamMember.description = bio || description || teamMember.description;
+  teamMember.hindi_description = hindi_description !== undefined ? hindi_description : teamMember.hindi_description;
+  
+  // Handle basic fields
   teamMember.email = email !== undefined ? email : teamMember.email;
   teamMember.phone = phone !== undefined ? phone : teamMember.phone;
+  
+  // Handle additional fields
+  if (category) teamMember.category = category;
+  if (region) teamMember.region = region;
+  
+  // Handle isFounder status (add a new field if needed)
+  if (isFounder !== undefined) {
+    teamMember.isFounder = isFounder === 'true' || isFounder === true;
+  }
+  
+  // Handle social media links (parse comma-separated string into object)
+  if (socialMedia) {
+    try {
+      const links = socialMedia.split(',').map(link => link.trim());
+      
+      // Extract social media platform from links
+      const socialLinks = {
+        linkedin: '',
+        twitter: '',
+        facebook: ''
+      };
+      
+      links.forEach(link => {
+        if (link.includes('linkedin.com')) {
+          socialLinks.linkedin = link;
+        } else if (link.includes('twitter.com') || link.includes('x.com')) {
+          socialLinks.twitter = link;
+        } else if (link.includes('facebook.com')) {
+          socialLinks.facebook = link;
+        }
+      });
+      
+      teamMember.socialLinks = socialLinks;
+    } catch (err) {
+      console.error('Error parsing social media links:', err);
+    }
+  }
 
   const updatedTeamMember = await teamMember.save();
   res.json(updatedTeamMember);

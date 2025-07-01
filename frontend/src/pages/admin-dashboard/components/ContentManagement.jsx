@@ -1,29 +1,39 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Icon from 'components/AppIcon';
-import teamService from 'services/teamService';
-import informationService from 'services/informationService';
+import Modal from 'components/ui/Modal';
+import LoadingSpinner from 'components/ui/LoadingSpinner';
+import { useAuth } from 'contexts/AuthContext';
+import TranslateText from 'components/TranslateText';
+
+// Import services
 import mediaService from 'services/mediaService';
+import bannerService from 'services/bannerService';
 import programService from 'services/programService';
 import projectService from 'services/projectService';
-import { formatDistanceToNow } from 'date-fns';
-import Modal from 'components/ui/Modal';
+import teamService from 'services/teamService';
+import informationService from 'services/informationService';
 import DynamicForm from './DynamicForm';
 import ConfirmModal from './ConfirmModal';
+import { formatDistanceToNow } from 'date-fns';
 
 const ContentManagement = () => {
+  const { user } = useAuth();
+  
+  // State variables
   const [activeTab, setActiveTab] = useState('media');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [mediaItems, setMediaItems] = useState([]);
+  const [banners, setBanners] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [informationContent, setInformationContent] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
-
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [informationContent, setInformationContent] = useState([]);
-  const [mediaItems, setMediaItems] = useState([]);
-  const [programs, setPrograms] = useState([]);
-  const [projects, setProjects] = useState([]);
+  const [notification, setNotification] = useState(null);
 
   const contentSections = [
     { id: 'media', title: 'Media Gallery', icon: 'Image', description: 'Manage photos and videos' },
@@ -121,6 +131,32 @@ const ContentManagement = () => {
           itemForEdit.thumbnailUrl = itemForEdit.thumbnailPath;
         }
       }
+    }
+    
+    // For team members, map fields correctly
+    if (activeTab === 'team') {
+      // Map description to bio field for the form
+      itemForEdit.bio = itemForEdit.description || '';
+      
+      // Map photo to image for the form
+      itemForEdit.image = itemForEdit.photo || '';
+      
+      // Hindi fields are already named correctly, but make sure they are at least empty strings
+      itemForEdit.hindi_name = itemForEdit.hindi_name || '';
+      itemForEdit.hindi_role = itemForEdit.hindi_role || '';
+      itemForEdit.hindi_description = itemForEdit.hindi_description || '';
+      
+      // Convert socialLinks object to comma-separated string for the form
+      if (itemForEdit.socialLinks) {
+        const links = [];
+        if (itemForEdit.socialLinks.linkedin) links.push(itemForEdit.socialLinks.linkedin);
+        if (itemForEdit.socialLinks.twitter) links.push(itemForEdit.socialLinks.twitter);
+        if (itemForEdit.socialLinks.facebook) links.push(itemForEdit.socialLinks.facebook);
+        
+        itemForEdit.socialMedia = links.join(', ');
+      }
+      
+      console.log('Team member prepared for edit:', itemForEdit);
     }
 
     console.log('Prepared for edit:', itemForEdit);
@@ -221,276 +257,247 @@ const ContentManagement = () => {
       const isEditing = currentItem && currentItem._id;
       const fileFieldsToSkip = [];
 
-      // For media items, ensure uploadType is explicitly included and correct
-      if (activeTab === 'media') {
-        // Make sure uploadType is included for video types
-        if ((formData.type === 'Documentary' || formData.type === 'Video Series')) {
-          // If uploadType is missing, set a default based on presence of videoLink
-          if (!formData.uploadType) {
-            formData.uploadType = formData.videoLink ? 'Video Link' : 'Upload File';
-            console.log(`Setting default uploadType: ${formData.uploadType}`);
-          }
-          
-          // If upload type is "Upload File" but videoLink exists, clear it
-          if (formData.uploadType === 'Upload File' && formData.videoLink) {
-            console.log('Clearing videoLink since uploadType is Upload File');
-            formData.videoLink = '';
-          }
-          
-          // If upload type is "Video Link" but no videoLink, check if we have an existing one
-          if (formData.uploadType === 'Video Link' && !formData.videoLink && currentItem?.videoLink) {
-            console.log('Using existing videoLink:', currentItem.videoLink);
-            formData.videoLink = currentItem.videoLink;
-          }
+      // For team members, handle field mappings
+      if (activeTab === 'team') {
+        // Map bio to description (backend field)
+        if (formData.bio !== undefined) {
+          data.append('description', formData.bio);
+        }
+
+        // Handle file field naming differences
+        if (formData.image instanceof File) {
+          data.append('photo', formData.image);
         }
         
-        console.log('Final uploadType and videoLink:', {
-          uploadType: formData.uploadType,
-          videoLink: formData.videoLink
-        });
-      }
-
-      // Special case for editing: if we're switching from video link to file upload
-      // but no file is provided, we need to warn the user
-      if (isEditing && activeTab === 'media' && 
-          currentItem.videoLink && 
-          formData.uploadType === 'Upload File' && 
-          !formData.mediafile) {
-        console.log('Switching from video link to file upload without providing a file');
-        // Note: The server will validate this case
-      }
-
-      if (isEditing) {
-        const fileFields = ['mediafile', 'photo', 'image', 'coverImage', 'imageUrl', 'photoUrl'];
-        fileFields.forEach(field => {
-          if (field in formData && !formData[field]) {
-            fileFieldsToSkip.push(field);
-          }
-        });
-      }
-
-      // Gallery handling
-      const galleryFiles = formData.gallery;
-      const galleryUrls = formData.galleryUrls;
-      delete formData.gallery;
-      delete formData.galleryUrls;
-
-      // Handle file-based gallery
-      if (galleryFiles && galleryFiles.length > 0) {
-        for (let i = 0; i < galleryFiles.length; i++) {
-          const file = galleryFiles[i];
-          if (file instanceof File) {
-            data.append('gallery', file);
-          }
+        // Pass through other fields
+        data.append('name', formData.name);
+        data.append('hindi_name', formData.hindi_name || '');
+        data.append('role', formData.role);
+        data.append('hindi_role', formData.hindi_role || '');
+        data.append('hindi_description', formData.hindi_description || '');
+        data.append('email', formData.email || '');
+        data.append('phone', formData.phone || '');
+        
+        if (formData.category) {
+          data.append('category', formData.category);
         }
+        
+        if (formData.region) {
+          data.append('region', formData.region);
+        }
+        
+        // Handle isFounder checkbox
+        if (formData.isFounder !== undefined) {
+          data.append('isFounder', formData.isFounder);
+        }
+        
+        // Handle social media links
+        if (formData.socialMedia) {
+          data.append('socialMedia', formData.socialMedia);
+        }
+      }
+      else {
+        // For media items, ensure uploadType is explicitly included and correct
+        if (activeTab === 'media') {
+          // Make sure uploadType is included for video types
+          if ((formData.type === 'Documentary' || formData.type === 'Video Series')) {
+            // If uploadType is missing, set a default based on presence of videoLink
+            if (!formData.uploadType) {
+              formData.uploadType = formData.videoLink ? 'Video Link' : 'Upload File';
+              console.log(`Setting default uploadType: ${formData.uploadType}`);
+            }
+            
+            // If upload type is "Upload File" but videoLink exists, clear it
+            if (formData.uploadType === 'Upload File' && formData.videoLink) {
+              console.log('Clearing videoLink since uploadType is Upload File');
+              formData.videoLink = '';
+            }
+            
+            // If upload type is "Video Link" but no videoLink, check if we have an existing one
+            if (formData.uploadType === 'Video Link' && !formData.videoLink && currentItem?.videoLink) {
+              console.log('Using existing videoLink:', currentItem.videoLink);
+              formData.videoLink = currentItem.videoLink;
+            }
+          }
+          
+          console.log('Final uploadType and videoLink:', {
+            uploadType: formData.uploadType,
+            videoLink: formData.videoLink
+          });
+        }
+
+        // Special case for editing: if we're switching from video link to file upload
+        // but no file is provided, we need to warn the user
+        if (isEditing && activeTab === 'media' && 
+            currentItem.videoLink && 
+            formData.uploadType === 'Upload File' && 
+            !formData.mediafile) {
+          console.log('Switching from video link to file upload without providing a file');
+          // Note: The server will validate this case
+        }
+
         if (isEditing) {
-          data.append('replaceGallery', 'true');
+          const fileFields = ['mediafile', 'photo', 'image', 'coverImage', 'imageUrl', 'photoUrl'];
+          fileFields.forEach(field => {
+            if (field in formData && !formData[field]) {
+              fileFieldsToSkip.push(field);
+            }
+          });
         }
-      } 
-      // Handle comma-separated URL gallery (primarily for media)
-      else if (galleryUrls && galleryUrls.trim() !== '') {
-        // Parse the comma-separated URLs
-        const urls = galleryUrls.split(',')
-          .map(url => url.trim())
-          .filter(url => url !== '');
-        
-        if (urls.length > 0) {
-          // Send the URLs as a string array rather than JSON to avoid parsing issues
-          data.append('galleryUrls', urls);
-        }
-      }
-      // Handle existing gallery in edit mode
-      else if (isEditing) {
-        if (multipleFiles?.gallery?.length === 0) {
-          data.append('clearGallery', 'true');
-        } else if (multipleFiles?.gallery?.length > 0) {
-          const existingImages = multipleFiles.gallery
-            .filter(url => !url.startsWith('blob:'))
-            .map(url => ({
-              url: url,
-              publicId: url.split('/').pop().split('.')[0]
-            }));
 
-          if (existingImages.length > 0) {
-            data.append('existingGallery', JSON.stringify(existingImages));
-          } else {
+        // Gallery handling
+        const galleryFiles = formData.gallery;
+        const galleryUrls = formData.galleryUrls;
+        delete formData.gallery;
+        delete formData.galleryUrls;
+
+        // Handle file-based gallery
+        if (galleryFiles && galleryFiles.length > 0) {
+          for (let i = 0; i < galleryFiles.length; i++) {
+            const file = galleryFiles[i];
+            if (file instanceof File) {
+              data.append('gallery', file);
+            }
+          }
+          if (isEditing) {
             data.append('replaceGallery', 'true');
           }
+        } 
+        // Handle comma-separated URL gallery (primarily for media)
+        else if (galleryUrls && galleryUrls.trim() !== '') {
+          // Parse the comma-separated URLs
+          const urls = galleryUrls.split(',')
+            .map(url => url.trim())
+            .filter(Boolean);
+          
+          // Add as array of URLs
+          data.append('galleryUrls', JSON.stringify(urls));
         }
-      }
+        
+        // Handle all other fields by appending to FormData
+        Object.entries(formData).forEach(([key, value]) => {
+          // Skip fields we've already handled
+          if (key === 'gallery' || key === 'galleryUrls') return;
 
-      // Convert expectedStartDate to ISO
-      if (formData.expectedStartDate) {
-        const date = new Date(formData.expectedStartDate);
-        if (!isNaN(date.getTime())) {
-          formData.expectedStartDate = date.toISOString();
-        }
-      }
-      
-      // Convert startDate and endDate to ISO for programs
-      if (formData.startDate) {
-        const date = new Date(formData.startDate);
-        if (!isNaN(date.getTime())) {
-          formData.startDate = date.toISOString();
-        }
-      }
-      
-      if (formData.endDate) {
-        const date = new Date(formData.endDate);
-        if (!isNaN(date.getTime())) {
-          formData.endDate = date.toISOString();
-        }
-      }
+          // Skip empty file fields when editing (or they'll clear existing values)
+          if (isEditing && fileFieldsToSkip.includes(key)) {
+            console.log(`Skipping empty file field: ${key}`);
+            return;
+          }
+          
+          // Skip any null/undefined values
+          if (value === null || value === undefined) return;
 
-      // Convert uploadDate to ISO for information items and media
-      if (formData.uploadDate) {
-        const date = new Date(formData.uploadDate);
-        if (!isNaN(date.getTime())) {
-          formData.uploadDate = date.toISOString();
-        }
+          // Handle file objects
+          if (value instanceof File) {
+            data.append(key, value);
+          }
+          // Handle boolean values
+          else if (typeof value === 'boolean') {
+            data.append(key, value.toString());
+          }
+          // Handle arrays or objects by stringifying
+          else if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+            data.append(key, JSON.stringify(value));
+          }
+          // Handle arrays
+          else if (Array.isArray(value)) {
+            // For multiselect values
+            if (value.every(item => typeof item === 'string')) {
+              data.append(key, value.join(','));
+            } else {
+              data.append(key, JSON.stringify(value));
+            }
+          }
+          // Regular string/number values
+          else {
+            data.append(key, value);
+          }
+        });
       }
-
-      if ((activeTab === 'programs' || activeTab === 'projects') && formData.title && !formData.name) {
-        formData.name = formData.title;
-        delete formData.title;
+    }
+    
+    // For debugging, output all data being sent to the server
+    if (!isRawFormData) {
+      console.log('Final form data to be sent:');
+      for (const pair of data.entries()) {
+        console.log(pair[0], pair[1]);
       }
-
-      Object.keys(formData).forEach(key => {
-        if (isEditing && fileFieldsToSkip.includes(key)) return;
-        if (formData[key] !== null && formData[key] !== undefined) {
-          data.append(key, formData[key]);
-        }
-      });
-    } else {
-      console.log('Using FormData instance directly, skipping conversion.');
     }
 
     try {
+      let response;
+
       if (currentItem && currentItem._id) {
-        // UPDATE EXISTING ITEM
+        // Update existing item
+        console.log(`Updating ${activeTab} item with ID: ${currentItem._id}`);
+        
         switch (activeTab) {
-          case 'media': 
-            // For media items, manually check the uploadType from the form
-            if (isRawFormData) {
-              const uploadType = formData.get('uploadType');
-              console.log('Media update - uploadType from form:', uploadType);
-              
-              // Special handling for Upload File - make sure videoLink is cleared
-              if (uploadType === 'Upload File') {
-                // Clear videoLink if present
-                formData.delete('videoLink');
-                // Set an explicit empty value
-                formData.set('videoLink', '');
-                console.log('Explicitly cleared videoLink for Upload File');
-              }
-            }
-            
-            await mediaService.updateMediaItem(currentItem._id, data); 
+          case 'media':
+            response = await mediaService.updateMediaItem(currentItem._id, data);
             break;
-          case 'programs': 
-            await programService.updateProgram(currentItem._id, data); 
+          case 'programs':
+            response = await programService.updateProgram(currentItem._id, data);
             break;
-          case 'projects': 
-            await projectService.updateProject(currentItem._id, data); 
+          case 'projects':
+            response = await projectService.updateProject(currentItem._id, data);
             break;
-          case 'team': 
-            await teamService.updateTeamMember(currentItem._id, data); 
+          case 'team':
+            response = await teamService.updateTeamMember(currentItem._id, data);
             break;
-          case 'information': 
-            // For information items, handle uploadType field
-            if (isRawFormData) {
-              const fileType = formData.get('fileType');
-              const uploadType = formData.get('uploadType');
-              console.log('Information update - fileType:', fileType, 'uploadType:', uploadType);
-              
-              // Only do special handling for video file types
-              if (fileType === 'video') {
-                if (uploadType === 'Upload File') {
-                  // Clear videoUrl if present for Upload File type
-                  formData.delete('videoUrl');
-                  formData.set('videoUrl', '');
-                  console.log('Cleared videoUrl for Upload File type');
-                } else if (uploadType === 'Video Link') {
-                  // Clear video file if present for Video Link type
-                  if (formData.has('video')) {
-                    formData.delete('video');
-                    console.log('Removed video file for Video Link type');
-                  }
-                }
-              }
-            }
-            
-            await informationService.updateInformationItem(currentItem.groupTitle, currentItem._id, data);
+          case 'information':
+            // For information items, we need the group title
+            const groupTitle = currentItem.groupTitle || processedData?.groupTitle || 'governmentSchemes';
+            response = await informationService.updateInformationItem(groupTitle, currentItem._id, data);
             break;
-          default: 
-            throw new Error('Invalid content type for update');
+          default:
+            throw new Error('Invalid content type for update operation');
         }
       } else {
-        // CREATE NEW ITEM
+        // Create new item
+        console.log(`Creating new ${activeTab} item`);
+        
         switch (activeTab) {
-          case 'media': 
-            // For media items, manually check the uploadType from the form
-            if (isRawFormData) {
-              const uploadType = formData.get('uploadType');
-              console.log('Media create - uploadType from form:', uploadType);
-              
-              // Special handling for Upload File - make sure videoLink is cleared
-              if (uploadType === 'Upload File') {
-                // Clear videoLink if present
-                formData.delete('videoLink');
-                // Set an explicit empty value
-                formData.set('videoLink', '');
-                console.log('Explicitly cleared videoLink for Upload File');
-              }
-            }
-            
-            await mediaService.createMediaItem(data); 
+          case 'media':
+            response = await mediaService.createMediaItem(data);
             break;
-          case 'programs': 
-            await programService.createProgram(data); 
+          case 'programs':
+            response = await programService.createProgram(data);
             break;
-          case 'projects': 
-            await projectService.createProject(data); 
+          case 'projects':
+            response = await projectService.createProject(data);
             break;
-          case 'team': 
-            await teamService.createTeamMember(data); 
+          case 'team':
+            response = await teamService.createTeamMember(data);
             break;
-          case 'information': 
-            // For new information items, handle uploadType field
-            if (isRawFormData) {
-              const fileType = formData.get('fileType');
-              const uploadType = formData.get('uploadType');
-              console.log('New information item - fileType:', fileType, 'uploadType:', uploadType);
-              
-              // Only do special handling for video file types
-              if (fileType === 'video') {
-                if (uploadType === 'Upload File') {
-                  // Clear videoUrl if present for Upload File type
-                  formData.delete('videoUrl');
-                  formData.set('videoUrl', '');
-                  console.log('Cleared videoUrl for Upload File type');
-                } else if (uploadType === 'Video Link') {
-                  // Clear video file if present for Video Link type
-                  if (formData.has('video')) {
-                    formData.delete('video');
-                    console.log('Removed video file for Video Link type');
-                  }
-                }
-              }
-            }
-            
-            await informationService.createInformationItem(data); 
+          case 'information':
+            // For information items, get the group title from form data
+            const groupTitle = processedData?.groupTitle || data.get('groupTitle') || 'governmentSchemes';
+            response = await informationService.createInformationItem(data);
             break;
-          default: 
-            throw new Error('Invalid content type for create');
+          default:
+            throw new Error('Invalid content type for create operation');
         }
       }
 
+      console.log(`${currentItem ? 'Update' : 'Create'} response:`, response);
+      
+      // Close the modal
       handleCloseModal();
+
+      // Show success toast message
+      showNotification(`The ${activeTab.slice(0, -1)} has been ${currentItem ? 'updated' : 'created'} successfully.`);
+
+      // Refresh data
       fetchData();
+
     } catch (err) {
-      console.error('Form submission error:', err);
-      setError(err.response?.data?.message || 'An error occurred during submission.');
+      console.error(`Error ${currentItem ? 'updating' : 'creating'} ${activeTab} item:`, err);
+      const errorMessage = err.response?.data?.message || err.message || 'Please try again later.';
+      setError(`Failed to ${currentItem ? 'update' : 'create'} item. ${errorMessage}`);
+      
+      // Show error toast message
+      showNotification(`Failed to ${currentItem ? 'update' : 'create'} item. ${errorMessage}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -538,8 +545,11 @@ const ContentManagement = () => {
       ],
       teamFields: [
         { name: 'name', label: 'Full Name', type: 'text', required: true },
+        { name: 'hindi_name', label: 'Hindi Full Name', type: 'text', required: false },
         { name: 'role', label: 'Role', type: 'text', required: true },
+        { name: 'hindi_role', label: 'Hindi Role', type: 'text', required: false },
         { name: 'bio', label: 'Biography', type: 'textarea', required: false },
+        { name: 'hindi_description', label: 'Hindi Biography', type: 'textarea', required: false },
         { name: 'category', label: 'Category', type: 'select', 
           options: ['Leadership', 'Core Team', 'Advisors', 'Regional Coordinators', 'Volunteers'], 
           required: true },
@@ -569,8 +579,8 @@ const ContentManagement = () => {
           options: ['national', 'North India', 'South India', 'East India', 'West India', 'Central India'], 
           required: true },
         { name: 'uploadType', label: 'Upload Type', type: 'select', 
-          options: ['Upload File', 'Video Link'], 
-          required: true },
+          options: ['None', 'Upload File', 'Video Link'], 
+          required: false },
         // The following fields will be shown conditionally based on the uploadType selection
       ]
     };
@@ -656,8 +666,8 @@ const ContentManagement = () => {
             name: 'image', 
             label: isEditing ? 'Image (only if changing)' : 'Image', 
             type: 'file', 
-            required: !isEditing, 
-            hint: (currentItem?.fileType === 'video' ? 'This will be used as the thumbnail for the video' : 'Upload an image file')
+            required: false, 
+            hint: 'Upload an image file for this content (optional)'
           },
         ];
       case 'projects':
@@ -695,8 +705,8 @@ const ContentManagement = () => {
             name: 'image', 
             label: isEditing ? 'Image (only if changing)' : 'Image', 
             type: 'file', 
-            required: !isEditing, 
-            hint: (currentItem?.fileType === 'video' ? 'This will be used as the thumbnail for the video' : 'Upload an image file')
+            required: false, 
+            hint: 'Upload an image file for this content (optional)'
           },
         ];
       case 'team':
@@ -730,8 +740,8 @@ const ContentManagement = () => {
             name: 'image', 
             label: isEditing ? 'Image (only if changing)' : 'Image', 
             type: 'file', 
-            required: !isEditing, 
-            hint: (currentItem?.fileType === 'video' ? 'This will be used as the thumbnail for the video' : 'Upload an image file')
+            required: false, 
+            hint: 'Upload an image file for this content (optional)'
           },
         ];
       default:
@@ -954,9 +964,41 @@ const ContentManagement = () => {
     );
   };
 
+  // Simple notification function
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000); // Auto-hide after 5 seconds
+  };
+
   return (
     <div className="space-y-6 relative">
       <GlobalLoadingIndicator isVisible={loading} />
+
+      {/* Notification Component */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg max-w-md ${
+          notification.type === 'error' ? 'bg-red-50 border-l-4 border-red-500' : 'bg-green-50 border-l-4 border-green-500'
+        }`}>
+          <div className="flex items-start">
+            <Icon 
+              name={notification.type === 'error' ? 'AlertCircle' : 'CheckCircle'} 
+              size={20} 
+              className={`mr-3 flex-shrink-0 ${notification.type === 'error' ? 'text-red-500' : 'text-green-500'}`} 
+            />
+            <div className="flex-1">
+              <p className={`font-medium ${notification.type === 'error' ? 'text-red-700' : 'text-green-700'}`}>
+                {notification.message}
+              </p>
+            </div>
+            <button 
+              onClick={() => setNotification(null)}
+              className="ml-4 text-gray-400 hover:text-gray-600"
+            >
+              <Icon name="X" size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {contentSections.map((section) => (

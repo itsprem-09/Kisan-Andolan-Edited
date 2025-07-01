@@ -5,9 +5,15 @@ import { useLanguage } from '../contexts/LanguageContext';
 const LanguageToggle = () => {
     const { language, toggleLanguage } = useLanguage();
 
+    const handleToggle = (e) => {
+        // Prevent default browser behavior to avoid page refresh
+        e.preventDefault();
+        toggleLanguage();
+    };
+
     return (
         <button
-            onClick={toggleLanguage}
+            onClick={handleToggle}
             className="bg-surface border border-border rounded-lg px-3 py-2 shadow-md hover:shadow-lg transition-smooth flex items-center space-x-2 focus:outline-none"
         >
             <span className="text-sm font-medium flex gap-2 p-1 items-center">

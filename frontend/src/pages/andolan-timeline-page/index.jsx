@@ -6,6 +6,7 @@ import LoadingSpinner from 'components/ui/LoadingSpinner';
 import Icon from 'components/AppIcon';
 import { useLanguage } from 'contexts/LanguageContext';
 import TranslateText from 'components/TranslateText';
+import { translateAchievement } from 'utils/translationUtils';
 
 import TimelineNode from './components/TimelineNode';
 import MilestoneCard from './components/MilestoneCard';
@@ -76,6 +77,14 @@ const AndolanTimelinePage = () => {
   const getPageText = (key) => {
     return language === 'hi' ? pageTranslations[key].hi : pageTranslations[key].en;
   };
+
+  // Save selected timeline position to localStorage
+  useEffect(() => {
+    if (selectedYear) {
+      localStorage.setItem('timelineSelectedYear', selectedYear.toString());
+      localStorage.setItem('timelineSelectedItemIndex', selectedItemIndex.toString());
+    }
+  }, [selectedYear, selectedItemIndex]);
 
   // Fetch timeline data from the API
   useEffect(() => {
@@ -163,8 +172,20 @@ const AndolanTimelinePage = () => {
 
           setDecades(decadesList);
 
-          // Set initial selections if data exists
-          if (sortedData.length > 0) {
+          // Try to restore previously selected timeline position
+          const savedYear = localStorage.getItem('timelineSelectedYear');
+          const savedIndex = localStorage.getItem('timelineSelectedItemIndex');
+          
+          if (savedYear && years.includes(parseInt(savedYear))) {
+            setSelectedYear(parseInt(savedYear));
+            
+            if (savedIndex) {
+              const maxIndex = sortedData.filter(item => item.year === parseInt(savedYear)).length - 1;
+              const parsedIndex = parseInt(savedIndex);
+              setSelectedItemIndex(parsedIndex > maxIndex ? 0 : parsedIndex);
+            }
+          } else if (sortedData.length > 0) {
+            // If no saved position or invalid year, set initial selections
             setSelectedYear(sortedData[0].year);
           }
 
@@ -180,7 +201,7 @@ const AndolanTimelinePage = () => {
     };
 
     fetchTimelineData();
-  }, [getTranslation]);
+  }, []);  // Remove getTranslation dependency
 
   const filteredData = timelineData.filter(item => {
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
@@ -616,6 +637,7 @@ const AndolanTimelinePage = () => {
                           images={item.images}
                           isKeyMilestone={item.isKeyMilestone}
                           compact={true}
+                          onClick={() => setSelectedItem(item)}
                         />
                       ))}
                   </div>
@@ -699,7 +721,7 @@ const AndolanTimelinePage = () => {
                     <Icon name="Award" size={22} />
                     <span>{getTranslation('achievement')}</span>
                   </h3>
-                  <p className="text-gray-800 leading-relaxed">{selectedItem.achievement}</p>
+                  <p className="text-gray-800 leading-relaxed">{translateAchievement(selectedItem.achievement, language)}</p>
                 </div>
               )}
 
