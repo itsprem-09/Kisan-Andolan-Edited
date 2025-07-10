@@ -13,6 +13,7 @@ import MemberRegistrationModal from "pages/member-registration-modal";
 import InformationCenterPage from "pages/information-center-page";
 import AboutPage from "pages/about-page";
 import YouthLeadershipProgramModal from "pages/youth-leadership-program-modal";
+import NominationFormModal from "pages/nomination-form-modal";
 import Login from "pages/login";
 import NotFound from "pages/NotFound";
 import PrivacyPolicy from "pages/PrivacyPolicy";
@@ -41,6 +42,7 @@ const Routes = () => {
             <Route path="/andolan-timeline-page" element={<><Header /><AndolanTimelinePage /><Footer /></>} />
             <Route path="/team-leadership-page" element={<><Header /><TeamLeadershipPage /><Footer /></>} />
             <Route path="/member-registration-modal" element={<><Header /><MemberRegistrationModal /><Footer /></>} />
+            <Route path="/nomination-form-modal" element={<><Header /><NominationFormModal /><Footer /></>} />
             <Route path="/information-center-page" element={<><Header /><InformationCenterPage /><Footer /></>} />
             <Route path="/about-page" element={<><Header /><AboutPage /><Footer /></>} />
             <Route path="/youth-leadership-program-modal" element={<><Header /><YouthLeadershipProgramModal /><Footer /></>} />

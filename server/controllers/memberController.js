@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Member = require('../models/Member');
 const { cloudinary } = require('../config/cloudinaryConfig'); // Import Cloudinary instance
+const { sendMemberRegistrationEmail, sendYouthRegistrationEmail } = require('../utils/emailService');
 
 // Generate a unique application ID
 const generateApplicationId = async (membershipType) => {
@@ -105,6 +106,18 @@ const registerMember = asyncHandler(async (req, res) => {
     message: 'Application submitted successfully. OTP verification pending.',
     member: createdMember
   });
+  
+  // Add this code for email notification
+  try {
+    if (createdMember.membershipType === 'Kisan Youth Leadership Program') {
+      await sendYouthRegistrationEmail(createdMember);
+    } else {
+      await sendMemberRegistrationEmail(createdMember);
+    }
+  } catch (emailError) {
+    console.error('Error sending registration email notification:', emailError);
+    // Don't fail the registration process if email fails
+  }
 });
 
 // @desc    Verify OTP for a member (Placeholder - OTP logic remains)
@@ -234,6 +247,46 @@ const deleteMemberApplication = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Get count of filtered member applications
+// @route   GET /api/members/filtered-count
+// @access  Private/Admin
+const getFilteredMemberCount = asyncHandler(async (req, res) => {
+  // Build filter object from query parameters
+  const filters = {};
+  
+  if (req.query.status) {
+    filters.status = req.query.status;
+  }
+  
+  if (req.query.membershipType) {
+    filters.membershipType = req.query.membershipType;
+  }
+  
+  // Date filtering
+  if (req.query.startDate || req.query.endDate) {
+    filters.applicationDate = {};
+    
+    if (req.query.startDate) {
+      filters.applicationDate.$gte = new Date(req.query.startDate);
+    }
+    
+    if (req.query.endDate) {
+      // Add one day to include the end date fully
+      const endDate = new Date(req.query.endDate);
+      endDate.setDate(endDate.getDate() + 1);
+      filters.applicationDate.$lte = endDate;
+    }
+  }
+  
+  const count = await Member.countDocuments(filters);
+  
+  res.json({
+    success: true,
+    count,
+    filters
+  });
+});
+
 module.exports = {
   registerMember,
   verifyOtp,
@@ -241,4 +294,5 @@ module.exports = {
   getMemberApplicationById,
   updateMemberApplication,
   deleteMemberApplication,
+  getFilteredMemberCount,
 };

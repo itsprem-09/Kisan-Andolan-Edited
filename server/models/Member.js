@@ -101,7 +101,7 @@ const memberSchema = new mongoose.Schema({
     type: String,
     default: ''
   }
-});
+}, { timestamps: true });
 
 // Update statusUpdatedAt timestamp when status changes
 memberSchema.pre('save', function(next) {

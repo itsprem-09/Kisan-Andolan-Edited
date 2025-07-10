@@ -7,6 +7,7 @@ const {
   getMemberApplicationById,
   updateMemberApplication,
   deleteMemberApplication,
+  getFilteredMemberCount
 } = require('../controllers/memberController');
 const { protect, admin } = require('../middleware/authMiddleware');
 const { upload, uploadSingle } = require('../middleware/uploadMiddleware');
@@ -18,6 +19,9 @@ router.post('/verify-otp', verifyOtp); // Public route for OTP verification
 // Admin routes for managing member applications
 router.route('/')
   .get(protect, admin, getMemberApplications); // Renamed to avoid conflict with POST
+
+// Admin route to get filtered count
+router.get('/filtered-count', protect, admin, getFilteredMemberCount);
 
 router.route('/:id')
   .get(protect, admin, getMemberApplicationById)

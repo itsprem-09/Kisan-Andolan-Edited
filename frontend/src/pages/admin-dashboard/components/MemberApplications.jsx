@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import Icon from 'components/AppIcon';
 import { useAuth } from 'contexts/AuthContext';
 import memberService from '../../../services/memberService';
+import nominationService from '../../../services/nominationService';
 import { MEMBER_STATUS, DOCUMENT_TYPES } from '../../../config/constants';
 import LoadingSpinner from 'components/ui/LoadingSpinner';
 import authService from '../../../services/authService';
 import Modal from 'components/ui/Modal';
 import Image from 'components/AppImage';
+import NominationManagement from './NominationManagement';
 
 const MemberApplications = () => {
+  const [activeTab, setActiveTab] = useState('members');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedApplications, setSelectedApplications] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -19,6 +22,50 @@ const MemberApplications = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState('members'); // 'members', 'youth', 'nominations'
+  const [exportFormat, setExportFormat] = useState('excel'); // 'excel' or 'pdf'
+  const [exportStatus, setExportStatus] = useState('all');
+  const [isExporting, setIsExporting] = useState(false);
+  // New state variables for expanded filtering options
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [showExportSelectedDropdown, setShowExportSelectedDropdown] = useState(false);
+  // Add alert modal state
+  const [alertMessage, setAlertMessage] = useState('');
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  
+  // Helper function to show alerts
+  const showAlert = (message) => {
+    setAlertMessage(message);
+    setShowAlertModal(true);
+  };
+  
+  // Custom Alert Modal Component
+  const AlertModal = ({ isOpen, onClose, message }) => {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Alert" size="sm">
+        <div className="p-4">
+          <div className="flex items-start mb-4">
+            <div className="flex-shrink-0 mr-3">
+              <Icon name="AlertTriangle" size={24} className="text-primary" />
+            </div>
+            <div className="text-text-primary">
+              {message}
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  };
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -31,12 +78,27 @@ const MemberApplications = () => {
           setIsLoading(false);
           return;
         }
+        
         const fetchedApplications = await memberService.getMemberApplications(token);
-        setApplications(fetchedApplications);
+        
+        // Ensure we have valid data (array)
+        if (Array.isArray(fetchedApplications)) {
+          setApplications(fetchedApplications);
+        } else if (fetchedApplications && Array.isArray(fetchedApplications.members)) {
+          // Handle case where the API returns { members: [...] }
+          setApplications(fetchedApplications.members);
+        } else {
+          // If we get unexpected data structure, set empty array
+          console.error('Unexpected data format received:', fetchedApplications);
+          setApplications([]);
+          setError('Received invalid data format from the server');
+        }
+        
         setError(null);
       } catch (err) {
         setError('Failed to load member applications. Please try again.');
         console.error('Error fetching applications:', err);
+        setApplications([]); // Ensure applications is at least an empty array
       } finally {
         setIsLoading(false);
       }
@@ -44,6 +106,12 @@ const MemberApplications = () => {
 
     fetchApplications();
   }, []);
+
+  // Tab definitions
+  const tabs = [
+    { id: 'members', label: 'Member Applications', icon: 'Users' },
+    { id: 'nominations', label: 'Award Nominations', icon: 'Award' }
+  ];
 
   const statusFilters = [
     { value: 'all', label: 'All Applications', count: applications.length },
@@ -55,16 +123,16 @@ const MemberApplications = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'Pending': { color: 'bg-warning text-white', label: 'Pending', icon: 'Clock' },
+      'Pending': { color: 'bg-yellow-500 text-white', label: 'Pending', icon: 'Clock' },
       'Under Review': { color: 'bg-blue-500 text-white', label: 'Under Review', icon: 'FileSearch' },
-      'Approved': { color: 'bg-success text-white', label: 'Approved', icon: 'CheckCircle' },
-      'Rejected': { color: 'bg-error text-white', label: 'Rejected', icon: 'XCircle' }
+      'Approved': { color: 'bg-green-500 text-white', label: 'Approved', icon: 'CheckCircle' },
+      'Rejected': { color: 'bg-red-500 text-white', label: 'Rejected', icon: 'XCircle' }
     };
     
     const config = statusConfig[status] || statusConfig.Pending;
     
     return (
-      <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+      <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium shadow-sm ${config.color}`}>
         <Icon name={config.icon} size={12} />
         <span>{config.label}</span>
       </span>
@@ -77,7 +145,7 @@ const MemberApplications = () => {
     }
     
     return (
-      <span className="px-2 py-1 bg-accent text-secondary text-xs rounded uppercase font-medium">
+      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded uppercase font-medium border border-blue-200">
         {documentType}
       </span>
     );
@@ -225,8 +293,19 @@ const MemberApplications = () => {
   };
   
   const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid (not Invalid Date)
+      if (isNaN(date.getTime())) return 'N/A';
+      
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return date.toLocaleDateString(undefined, options);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
   };
 
   // Delete Confirmation Modal Component
@@ -250,19 +329,19 @@ const MemberApplications = () => {
               </div>
             </div>
           </div>
-
-          <div className="flex justify-end space-x-3">
-            <button
+          
+          <div className="flex justify-end space-x-4">
+            <button 
               onClick={onClose}
-              className="px-4 py-2 border border-border rounded-md text-text-primary hover:bg-background transition-smooth"
+              className="px-4 py-2 bg-accent text-secondary rounded-md hover:bg-accent-dark"
             >
               Cancel
             </button>
-            <button
+            <button 
               onClick={onConfirm}
-              className="px-4 py-2 bg-error text-white rounded-md hover:bg-red-600 transition-smooth"
+              className="px-4 py-2 bg-error text-white rounded-md hover:bg-red-700"
             >
-              Delete Application
+              Delete Member
             </button>
           </div>
         </div>
@@ -273,101 +352,166 @@ const MemberApplications = () => {
   // Member Details Modal Component
   const MemberDetailsModal = ({ member, isOpen, onClose, getStatusBadge, formatDate }) => {
     if (!member) return null;
-    
+
+    const handleStatusChange = async (newStatus) => {
+      await handleUpdateStatus(member._id, newStatus);
+      onClose();
+    };
+
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Member Application Details">
-        <div className="space-y-8 p-4">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-text-secondary">Full Name</p>
-                <p className="font-medium text-text-primary">{member.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-text-secondary">Village</p>
-                <p className="font-medium text-text-primary">{member.village}</p>
-              </div>
-              <div>
-                <p className="text-sm text-text-secondary">City</p>
-                <p className="font-medium text-text-primary">{member.city}</p>
-              </div>
-              <div>
-                <p className="text-sm text-text-secondary">Phone Number</p>
-                <p className="font-medium text-text-primary">+91 {member.phoneNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm text-text-secondary">Application ID</p>
-                <p className="font-medium text-text-primary">{member.applicationId}</p>
-              </div>
-              <div>
-                <p className="text-sm text-text-secondary">Membership Type</p>
-                <p className="font-medium text-text-primary">{member.membershipType}</p>
-              </div>
-              
-              {/* Youth Leadership Program specific fields */}
-              {member.membershipType === 'Kisan Youth Leadership Program' && (
-                <>
-                  <div>
-                    <p className="text-sm text-text-secondary">Age</p>
-                    <p className="font-medium text-text-primary">{member.age} years</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-text-secondary">Education</p>
-                    <p className="font-medium text-text-primary">{member.education}</p>
-                  </div>
-                  {member.experience && (
-                    <div className="col-span-2">
-                      <p className="text-sm text-text-secondary">Experience</p>
-                      <p className="font-medium text-text-primary">{member.experience}</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-          
-          {/* Document Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Document Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-text-secondary">Document Type</p>
-                <p className="font-medium text-text-primary">{member.documentType || 'Not Provided'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-text-secondary">Document Verification</p>
-                <p className="font-medium text-text-primary">
-                  {member.documentPhoto ? 'Document Uploaded' : 'No Document Uploaded'}
-                </p>
-              </div>
-            </div>
+      <Modal isOpen={isOpen} onClose={onClose} title={`Member Application: ${member.name}`} size="lg">
+        <div className="space-y-6 p-4">
+          {/* Member Information */}
+          <div className="bg-background-light p-6 rounded-lg border border-border">
+            <h3 className="text-lg font-bold font-heading mb-4">Personal Information</h3>
             
-            {member.documentPhoto && (
-              <div className="mt-2">
-                <p className="text-sm text-text-secondary mb-2">Document Preview</p>
-                <div className="border rounded-lg overflow-hidden">
-                  <Image 
-                    src={member.documentPhoto} 
-                    alt="Document" 
-                    className="w-full h-auto max-h-48 object-contain" 
-                  />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-text-secondary">Application ID</p>
+                    <p className="text-text-primary font-medium">{member.applicationId}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-text-secondary">Full Name</p>
+                    <p className="text-text-primary font-medium">{member.name}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-text-secondary">Mobile Number</p>
+                    <p className="text-text-primary font-medium">{member.mobile}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-text-secondary">Email</p>
+                    <p className="text-text-primary font-medium">{member.email || 'Not provided'}</p>
+                  </div>
                 </div>
               </div>
-            )}
+              
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-text-secondary">Location</p>
+                  <p className="text-text-primary font-medium">{member.district}, {member.state}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-text-secondary">Occupation</p>
+                  <p className="text-text-primary font-medium">{member.occupation}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-text-secondary">Member Type</p>
+                  <p className="text-text-primary font-medium">{member.membershipType || member.memberType || 'General Member'}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-text-secondary">Land Holding</p>
+                  <p className="text-text-primary font-medium">{member.landHolding || 'Not provided'}</p>
+                </div>
+              </div>
+            </div>
           </div>
           
-          {/* Status Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Application Status</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-text-secondary">Current Status</p>
-                <div className="mt-1">{getStatusBadge(member.status)}</div>
+          {/* ID Verification */}
+          <div className="bg-background-light p-6 rounded-lg border border-border">
+            <h3 className="text-lg font-bold font-heading mb-4">ID Verification</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-text-secondary">ID Type</p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    {getDocumentBadge(member.idType)}
+                  </div>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-text-secondary">ID Number</p>
+                  <p className="text-text-primary font-medium">{member.idNumber || 'Not provided'}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-text-secondary">ID Document</p>
+                  {member.idProofUrl ? (
+                    <a 
+                      href={member.idProofUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center"
+                    >
+                      <Icon name="ExternalLink" size={16} className="mr-1" />
+                      View Document
+                    </a>
+                  ) : (
+                    <p className="text-text-secondary">Not provided</p>
+                  )}
+                </div>
               </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-text-secondary">Photo</p>
+                  {member.photoUrl ? (
+                    <div className="mt-1 h-24 w-24 rounded-md overflow-hidden border border-border">
+                      <Image 
+                        src={member.photoUrl} 
+                        alt={`Photo of ${member.name}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-text-secondary">Not provided</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Status and Actions */}
+          <div className="bg-background-light p-6 rounded-lg border border-border">
+            <div className="flex flex-col md:flex-row justify-between">
+              <div className="mb-4 md:mb-0">
+                <h3 className="text-lg font-bold font-heading mb-2">Application Status</h3>
+                <div className="flex items-center space-x-3">
+                  {getStatusBadge(member.status)}
+                  <span className="text-text-secondary text-sm">
+                    Applied on {formatDate(member.createdAt)}
+                  </span>
+                </div>
+              </div>
+              
               <div>
-                <p className="text-sm text-text-secondary">Submission Date</p>
-                <p className="font-medium text-text-primary">{formatDate(member.applicationDate)}</p>
+                <h3 className="text-lg font-bold font-heading mb-2">Actions</h3>
+                <div className="flex flex-wrap gap-2">
+                  {member.status !== 'Under Review' && (
+                    <button 
+                      onClick={() => handleStatusChange('Under Review')}
+                      className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600"
+                    >
+                      Mark for Review
+                    </button>
+                  )}
+                  
+                  {member.status !== 'Approved' && (
+                    <button 
+                      onClick={() => handleStatusChange('Approved')}
+                      className="px-3 py-1 bg-success text-white rounded-md text-sm hover:bg-success-dark"
+                    >
+                      Approve
+                    </button>
+                  )}
+                  
+                  {member.status !== 'Rejected' && (
+                    <button 
+                      onClick={() => handleStatusChange('Rejected')}
+                      className="px-3 py-1 bg-error text-white rounded-md text-sm hover:bg-error-dark"
+                    >
+                      Reject
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -376,278 +520,637 @@ const MemberApplications = () => {
     );
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {statusFilters.map((filter) => (
-          <button
-            key={filter.value}
-            onClick={() => setFilterStatus(filter.value)}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-smooth ${
-              filterStatus === filter.value
-                ? 'bg-primary text-white' :'bg-background text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            {filter.label}
-            <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-              filterStatus === filter.value
-                ? 'bg-white bg-opacity-20' :'bg-accent text-secondary'
-            }`}>
-              {filter.count}
-            </span>
-          </button>
-        ))}
-      </div>
+  // Handle export
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      const token = authService.getToken();
+      
+      if (!token) {
+        showAlert('Authentication token not found. Please log in again.');
+        setIsExporting(false);
+        return;
+      }
+      
+      // Create filters object with all filtering options
+      const filters = {
+        status: exportStatus === 'all' ? undefined : exportStatus,
+        startDate: exportStartDate || undefined,
+        endDate: exportEndDate || undefined
+      };
+      
+      // Check if any filter is applied
+      const hasActiveFilters = exportStatus !== 'all' || exportStartDate || exportEndDate;
+      
+      // First check if there are any records matching the filter before exporting
+      if (exportType === 'members') {
+        if (hasActiveFilters) {
+          try {
+            const filteredMembers = await memberService.checkFilteredMembers(filters, token);
+            if (!filteredMembers) {
+              showAlert('No member applications found with the selected filters. Please adjust your filters and try again.');
+              setIsExporting(false);
+              return;
+            }
+          } catch (checkError) {
+            console.error('Error checking filtered members:', checkError);
+            showAlert('Failed to check filtered members. Please try again.');
+            setIsExporting(false);
+            return;
+          }
+        }
+        
+        if (exportFormat === 'excel') {
+          await memberService.exportMembersToExcel(filters, token);
+        } else {
+          await memberService.exportMembersToPdf(filters, token);
+        }
+      } else if (exportType === 'youth') {
+        if (hasActiveFilters) {
+          try {
+            const filteredYouth = await memberService.checkFilteredYouth(filters, token);
+            if (!filteredYouth) {
+              showAlert('No youth leadership applications found with the selected filters. Please adjust your filters and try again.');
+              setIsExporting(false);
+              return;
+            }
+          } catch (checkError) {
+            console.error('Error checking filtered youth:', checkError);
+            showAlert('Failed to check filtered youth applications. Please try again.');
+            setIsExporting(false);
+            return;
+          }
+        }
+        
+        if (exportFormat === 'excel') {
+          await memberService.exportYouthToExcel(filters, token);
+        } else {
+          await memberService.exportYouthToPdf(filters, token);
+        }
+      } else if (exportType === 'nominations') {
+        if (hasActiveFilters) {
+          try {
+            const filteredNominations = await nominationService.checkFilteredNominations(filters, token);
+            if (!filteredNominations) {
+              showAlert('No nominations found with the selected filters. Please adjust your filters and try again.');
+              setIsExporting(false);
+              return;
+            }
+          } catch (checkError) {
+            console.error('Error checking filtered nominations:', checkError);
+            showAlert('Failed to check filtered nominations. Please try again.');
+            setIsExporting(false);
+            return;
+          }
+        }
+        
+        if (exportFormat === 'excel') {
+          await nominationService.exportNominationsToExcel(filters, token);
+        } else {
+          await nominationService.exportNominationsToPdf(filters, token);
+        }
+      }
+      
+      setShowExportModal(false);
+    } catch (err) {
+      showAlert(`Failed to export data. ${err.message || 'Please try again later.'}`);
+      console.error('Export error:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  // Handle individual PDF download
+  const handleDownloadPdf = async (id) => {
+    try {
+      setIsLoading(true);
+      const token = authService.getToken();
+      
+      if (!token) {
+        setError('Authentication token not found. Please log in again.');
+        setIsLoading(false);
+        return;
+      }
+      
+      if (activeTab === 'members') {
+        await memberService.downloadMemberPdf(id, token);
+      } else {
+        await nominationService.downloadNominationPdf(id, token);
+      }
+    } catch (err) {
+      setError(`Failed to download PDF. ${err.message}`);
+      console.error('PDF download error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      {/* Loading overlay */}
-      {isLoading && applications.length > 0 && (
-        <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg shadow-lg flex items-center space-x-3">
-            <LoadingSpinner size={24} />
-            <span>Processing...</span>
-          </div>
-        </div>
-      )}
-
-      {/* Error notification */}
-      {error && applications.length > 0 && (
-        <div className="bg-error bg-opacity-10 border-l-4 border-error p-4 rounded-r-md">
-          <div className="flex items-start">
-            <Icon name="AlertCircle" size={20} className="text-error mr-3 mt-0.5" />
+  // Export Modal Component
+  const ExportModal = ({ isOpen, onClose }) => {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Export Data">
+        <div className="space-y-6 p-4">
+          <div className="space-y-4">
             <div>
-              <p className="font-medium text-error">{error}</p>
-              <button 
-                onClick={() => setError(null)} 
-                className="text-sm text-text-primary underline mt-1"
+              <label className="block text-sm font-medium text-text-secondary mb-1">Export Type</label>
+              <select 
+                className="w-full px-3 py-2 border border-border rounded-md"
+                value={exportType}
+                onChange={(e) => setExportType(e.target.value)}
+                disabled={isExporting}
               >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Actions */}
-      {selectedApplications.length > 0 && (
-        <div className="card bg-accent">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-text-primary">
-                {selectedApplications.length} application(s) selected
-              </span>
+                <option value="members">Member Applications</option>
+                <option value="youth">Youth Leadership Applications</option>
+                <option value="nominations">Award Nominations</option>
+              </select>
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Export Format</label>
+              <div className="flex space-x-4">
+                <label className="inline-flex items-center">
+                  <input 
+                    type="radio" 
+                    name="exportFormat" 
+                    value="excel" 
+                    checked={exportFormat === 'excel'} 
+                    onChange={() => setExportFormat('excel')}
+                    disabled={isExporting}
+                    className="form-radio h-4 w-4 text-primary"
+                  />
+                  <span className="ml-2">Excel (.xlsx)</span>
+                </label>
+                
+                <label className="inline-flex items-center">
+                  <input 
+                    type="radio" 
+                    name="exportFormat" 
+                    value="pdf" 
+                    checked={exportFormat === 'pdf'} 
+                    onChange={() => setExportFormat('pdf')}
+                    disabled={isExporting}
+                    className="form-radio h-4 w-4 text-primary"
+                  />
+                  <span className="ml-2">PDF</span>
+                </label>
+              </div>
+            </div>
+            
+            <div className="bg-accent bg-opacity-20 p-4 rounded-md">
+              <h4 className="font-medium mb-3">Filter Options</h4>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Status</label>
+                  <select 
+                    className="w-full px-3 py-2 border border-border rounded-md"
+                    value={exportStatus}
+                    onChange={(e) => setExportStatus(e.target.value)}
+                    disabled={isExporting}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Under Review">Under Review</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                    {exportType === 'nominations' && (
+                      <>
+                        <option value="Shortlisted">Shortlisted</option>
+                        <option value="Awarded">Awarded</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Date From</label>
+                    <input
+                      type="date"
+                      className="w-full px-3 py-2 border border-border rounded-md"
+                      value={exportStartDate}
+                      onChange={(e) => setExportStartDate(e.target.value)}
+                      disabled={isExporting}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1">Date To</label>
+                    <input
+                      type="date"
+                      className="w-full px-3 py-2 border border-border rounded-md"
+                      value={exportEndDate}
+                      onChange={(e) => setExportEndDate(e.target.value)}
+                      disabled={isExporting}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-4">
+            <button 
+              onClick={onClose}
+              className="px-4 py-2 bg-accent text-secondary rounded-md hover:bg-accent-dark"
+              disabled={isExporting}
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleExport}
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark flex items-center space-x-2"
+              disabled={isExporting}
+            >
+              {isExporting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="Download" size={16} />
+                  <span>Export</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  };
+
+  // Add a function to handle exporting selected members directly
+  const handleExportSelected = async (format = 'pdf') => {
+    try {
+      if (selectedApplications.length === 0) {
+        setError('No members selected for export. Please select at least one member.');
+        return;
+      }
+
+      setIsExporting(true);
+      const token = authService.getToken();
+      
+      if (!token) {
+        setError('Authentication token not found. Please log in again.');
+        setIsExporting(false);
+        return;
+      }
+      
+      // Directly export selected members without opening modal
+      if (format === 'excel') {
+        await memberService.exportSelectedMembersToExcel(selectedApplications, token);
+      } else {
+        await memberService.exportSelectedMembersToPdf(selectedApplications, token);
+      }
+    } catch (err) {
+      setError(`Failed to export selected members. ${err.message}`);
+      console.error('Export error:', err);
+    } finally {
+      setShowExportSelectedDropdown(false);
+      setIsExporting(false);
+    }
+  };
+
+  const renderMembers = () => (
+    <>
+      {/* Status Filter Tabs */}
+      <div className="mb-6">
+        <div className="border-b border-border">
+          <nav className="flex flex-nowrap overflow-x-auto space-x-2 md:space-x-6">
+            {statusFilters.map((filter) => (
               <button
-                onClick={() => handleBulkAction('review')}
-                className="bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-600 transition-smooth"
-                disabled={isLoading}
+                key={filter.value}
+                onClick={() => setFilterStatus(filter.value)}
+                className={`flex items-center space-x-2 py-3 px-2 border-b-2 font-medium text-sm whitespace-nowrap transition-smooth ${
+                  filterStatus === filter.value
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border'
+                }`}
               >
-                <Icon name="FileSearch" size={16} className="mr-2" />
-                Mark as Under Review
+                <span>{filter.label}</span>
+                <span className="bg-accent text-secondary text-xs px-2 py-0.5 rounded-full">
+                  {filter.count}
+                </span>
               </button>
-              <button
-                onClick={() => handleBulkAction('approve')}
-                className="btn-primary text-sm px-4 py-2"
-                disabled={isLoading}
-              >
-                <Icon name="CheckCircle" size={16} className="mr-2" />
-                Approve
-              </button>
-              <button
-                onClick={() => handleBulkAction('reject')}
-                className="bg-error text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-600 transition-smooth"
-                disabled={isLoading}
-              >
-                <Icon name="XCircle" size={16} className="mr-2" />
-                Reject
-              </button>
-              <button
-                onClick={() => setSelectedApplications([])}
-                className="p-2 rounded-md hover:bg-background transition-smooth"
-                disabled={isLoading}
-              >
-                <Icon name="X" size={16} />
-              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Content Area */}
+      {isLoading ? (
+        <div className="py-12 flex justify-center">
+          <LoadingSpinner />
+        </div>
+      ) : error ? (
+        <div className="py-12">
+          <div className="bg-error bg-opacity-10 border-l-4 border-error p-4 rounded-r">
+            <div className="flex items-start">
+              <Icon name="AlertCircle" size={20} className="text-error mt-0.5 mr-3" />
+              <div>
+                <p className="text-error font-medium">{error}</p>
+                <button 
+                  onClick={() => setError(null)}
+                  className="text-sm text-text-secondary underline mt-1"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Applications Table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-background border-b border-border">
-              <tr>
-                <th className="text-left p-4">
-                  <input
-                    type="checkbox"
-                    checked={selectedApplications.length === filteredApplications.length && filteredApplications.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-border focus:ring-primary"
-                    disabled={isLoading}
-                  />
-                </th>
-                <th className="text-left p-4 font-medium text-text-primary">Applicant</th>
-                <th className="text-left p-4 font-medium text-text-primary">Type</th>
-                <th className="text-left p-4 font-medium text-text-primary">Contact</th>
-                <th className="text-left p-4 font-medium text-text-primary">Status</th>
-                <th className="text-left p-4 font-medium text-text-primary">Documents</th>
-                <th className="text-left p-4 font-medium text-text-primary">Submitted</th>
-                <th className="text-left p-4 font-medium text-text-primary">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredApplications.map((application) => (
-                <tr key={application._id} className="border-b border-border hover:bg-background transition-smooth">
-                  <td className="p-4">
+      ) : filteredApplications.length === 0 ? (
+        <div className="py-12 text-center">
+          <Icon name="Users" size={48} className="text-text-secondary opacity-40 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-text-primary mb-1">No applications found</h3>
+          <p className="text-text-secondary">
+            {filterStatus === 'all' 
+              ? 'There are no member applications submitted yet.' 
+              : `There are no applications with status "${filterStatus}".`}
+          </p>
+        </div>
+      ) : (
+        <div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th scope="col" className="w-12 px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                     <input
                       type="checkbox"
-                      checked={selectedApplications.includes(application._id)}
-                      onChange={() => handleSelectApplication(application._id)}
-                      className="rounded border-border focus:ring-primary"
-                      disabled={isLoading}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      checked={selectedApplications.length === filteredApplications.length && filteredApplications.length > 0}
+                      onChange={handleSelectAll}
                     />
-                  </td>
-                  
-                  <td className="p-4">
-                    <div>
-                      <div className="font-medium text-text-primary">
-                        {application.name}
-                      </div>
-                      <div className="text-sm text-text-secondary">
-                        {application.village}
-                      </div>
-                    </div>
-                  </td>
-                  
-                  <td className="p-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      application.membershipType === 'Kisan Youth Leadership Program' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {application.membershipType === 'Kisan Youth Leadership Program' ? 'Youth Program' : 'General Member'}
-                    </span>
-                  </td>
-                  
-                  <td className="p-4">
-                    <div className="text-sm text-text-primary">
-                      +91 {application.phoneNumber}
-                    </div>
-                  </td>
-                  
-                  <td className="p-4">
-                    {getStatusBadge(application.status)}
-                  </td>
-                  
-                  <td className="p-4">
-                    <div className="flex flex-col gap-1">
-                      {application.documentType !== 'Not Provided' ? (
-                        getDocumentBadge(application.documentType)
-                      ) : (
-                        <span className="text-xs text-text-secondary">None</span>
-                      )}
-                    </div>
-                  </td>
-                  
-                  <td className="p-4">
-                    <div className="text-sm text-text-secondary">
-                      {formatDate(application.applicationDate)}
-                    </div>
-                  </td>
-                  
-                  <td className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleViewApplication(application._id)}
-                        className="p-2 rounded-md hover:bg-background transition-smooth"
-                        title="View Details"
-                        disabled={isLoading}
-                      >
-                        <Icon name="Info" size={16} />
-                      </button>
-                      
-                      {application.status === 'Pending' && (
-                        <>
-                          <button
-                            onClick={() => handleUpdateStatus(application._id, 'Under Review')}
-                            className="p-2 rounded-md hover:bg-background transition-smooth text-blue-500"
-                            title="Mark as Under Review"
-                            disabled={isLoading}
-                          >
-                            <Icon name="FileSearch" size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleUpdateStatus(application._id, 'Approved')}
-                            className="p-2 rounded-md hover:bg-background transition-smooth text-success"
-                            title="Approve"
-                            disabled={isLoading}
-                          >
-                            <Icon name="CheckCircle" size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleUpdateStatus(application._id, 'Rejected')}
-                            className="p-2 rounded-md hover:bg-background transition-smooth text-error"
-                            title="Reject"
-                            disabled={isLoading}
-                          >
-                            <Icon name="XCircle" size={16} />
-                          </button>
-                        </>
-                      )}
-                      
-                      <button
-                        onClick={() => handleDeleteConfirmation(application._id)}
-                        className="p-2 rounded-md hover:bg-background transition-smooth text-error"
-                        title="Delete Application"
-                        disabled={isLoading}
-                      >
-                        <Icon name="Trash2" size={16} />
-                      </button>
-                    </div>
-                  </td>
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Applicant
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Contact
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Location
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Member Type
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    ID Proof
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Applied On
+                  </th>
+                  <th scope="col" className="w-24 px-3 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {filteredApplications.length === 0 && (
-          <div className="text-center py-12">
-            <Icon name="Users" size={48} className="text-accent mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-text-primary mb-2">
-              No Applications Found
-            </h3>
-            <p className="text-text-secondary">
-              {filterStatus === 'all' ?'No member applications have been submitted yet.'
-                : `No applications with status "${filterStatus}" found.`
-              }
-            </p>
+              </thead>
+              <tbody className="bg-white divide-y divide-border">
+                {filteredApplications.map((application) => (
+                  <tr key={application._id} className="hover:bg-background-light transition-smooth">
+                    <td className="px-3 py-4">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-primary focus:ring-primary border-border rounded"
+                        checked={selectedApplications.includes(application._id)}
+                        onChange={() => handleSelectApplication(application._id)}
+                      />
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 rounded-full overflow-hidden bg-accent mr-3">
+                          {application.photoUrl ? (
+                            <img 
+                              src={application.photoUrl} 
+                              alt={application.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center bg-secondary text-white text-xs font-bold">
+                              {application.name ? application.name.charAt(0).toUpperCase() : 'U'}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-black">{application.name || 'Unknown'}</p>
+                          <p className="text-xs text-gray-600">{application.applicationId || 'No ID'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <div className="text-sm text-black">{application.mobile || application.phoneNumber || 'No contact'}</div>
+                      <div className="text-xs text-gray-600">{application.email || 'No email'}</div>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <div className="text-sm text-black">{application.district || application.village || 'Not specified'}</div>
+                      <div className="text-xs text-gray-600">{application.state || application.city || 'Not specified'}</div>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <div className="text-sm text-black">{application.membershipType || application.memberType || 'General Member'}</div>
+                      <div className="text-xs text-gray-600">{application.occupation || 'Not specified'}</div>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      {getDocumentBadge(application.idType) || (
+                        <span className="text-sm text-gray-600">Not provided</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      {getStatusBadge(application.status || 'Pending')}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-black font-medium">
+                      {formatDate(application.createdAt)}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => handleViewApplication(application._id)}
+                          className="text-primary hover:text-primary-dark"
+                          title="View Details"
+                        >
+                          <Icon name="Eye" size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDownloadPdf(application._id)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Download PDF"
+                        >
+                          <Icon name="FileText" size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteConfirmation(application._id)}
+                          className="text-error hover:text-red-700"
+                          title="Delete"
+                        >
+                          <Icon name="Trash2" size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
-      
+
+          {/* Pagination would go here */}
+        </div>
+      )}
+
       {/* Member Details Modal */}
-      <MemberDetailsModal 
-        member={selectedMember} 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-        getStatusBadge={getStatusBadge}
-        formatDate={formatDate}
-      />
-      
+      {selectedMember && (
+        <MemberDetailsModal
+          member={selectedMember}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedMember(null);
+          }}
+          getStatusBadge={getStatusBadge}
+          formatDate={formatDate}
+        />
+      )}
+
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
-        member={memberToDelete}
         isOpen={isDeleteModalOpen}
         onClose={() => {
           setIsDeleteModalOpen(false);
           setMemberToDelete(null);
         }}
         onConfirm={handleDeleteMember}
+        member={memberToDelete}
+      />
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+      />
+      
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        message={alertMessage}
+      />
+    </>
+  );
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-border p-6">
+      <div className="mb-6 flex flex-col md:flex-row justify-between md:items-center">
+        <div className="mb-4 md:mb-0">
+          <h2 className="text-xl font-bold font-heading text-text-primary">Registration Management</h2>
+          <p className="text-text-secondary">Manage member applications and award nominations</p>
+        </div>
+
+        <div className="flex items-center space-x-3">
+          {selectedApplications.length > 0 && activeTab === 'members' && (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-text-secondary">
+                {selectedApplications.length} selected
+              </span>
+              <div className="border-l border-border h-6 mx-2" />
+              <button
+                onClick={() => handleBulkAction('review')}
+                className="px-3 py-1.5 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 font-medium"
+              >
+                Mark for Review
+              </button>
+              <button
+                onClick={() => handleBulkAction('approve')}
+                className="px-3 py-1.5 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 font-medium"
+              >
+                Approve
+              </button>
+              <button
+                onClick={() => handleBulkAction('reject')}
+                className="px-3 py-1.5 bg-red-500 text-white rounded-md text-sm hover:bg-red-600 font-medium"
+              >
+                Reject
+              </button>
+              <div className="border-l border-border h-6 mx-2" />
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportSelectedDropdown(prev => !prev)}
+                  className="px-3 py-1.5 bg-primary text-white rounded-md text-sm hover:bg-primary-dark font-medium flex items-center"
+                  type="button"
+                >
+                  <Icon name="Download" size={14} className="mr-1" />
+                  <span>Export Selected</span>
+                </button>
+                {showExportSelectedDropdown && (
+                  <div className="absolute right-0 mt-1 bg-white shadow-lg rounded-md border border-border py-1 z-10">
+                    <button
+                      onClick={() => {
+                        handleExportSelected('excel');
+                        setShowExportSelectedDropdown(false);
+                      }}
+                      className="px-4 py-2 text-sm text-gray-700 hover:bg-accent hover:text-secondary w-full text-left"
+                    >
+                      Excel
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportSelected('pdf');
+                        setShowExportSelectedDropdown(false);
+                      }}
+                      className="px-4 py-2 text-sm text-gray-700 hover:bg-accent hover:text-secondary w-full text-left"
+                    >
+                      PDF
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              setExportType(activeTab === 'members' ? 'members' : 'nominations');
+              setShowExportModal(true);
+            }}
+            className="px-3 py-1.5 bg-primary text-white rounded-md text-sm hover:bg-primary-dark flex items-center space-x-1"
+          >
+            <Icon name="Download" size={14} />
+            <span>Export All</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Section Tabs */}
+      <div className="mb-6">
+        <div className="border-b border-border">
+          <nav className="flex space-x-8">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 py-4 px-2 border-b-2 font-medium text-sm transition-smooth ${
+                  activeTab === tab.id
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border'
+                }`}
+              >
+                <Icon name={tab.icon} size={16} />
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Content based on active tab */}
+      {activeTab === 'members' ? renderMembers() : <NominationManagement />}
+      
+      {/* Custom Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        message={alertMessage}
       />
     </div>
   );

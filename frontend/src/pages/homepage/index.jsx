@@ -19,6 +19,10 @@ const Homepage = () => {
     navigate('/youth-leadership-program-modal');
   };
 
+  const handleNominationForm = () => {
+    navigate('/nomination-form-modal');
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header with Language Toggle */}
@@ -28,6 +32,7 @@ const Homepage = () => {
       <HeroSection 
         onMemberRegistration={handleMemberRegistration}
         onYouthLeadership={handleYouthLeadership}
+        onNominationForm={handleNominationForm}
       />
 
       {/* Mission Highlights */}

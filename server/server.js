@@ -14,13 +14,22 @@ const app = express();
 // Body parser
 app.use(express.json());
 
+// Request logger middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // Enable CORS with specific options
 app.use(cors({
-  origin: ['https://api.rashtriyakisanmanch.com', 'http://localhost:4028', 'http://localhost:3000', 'https://rashtriya-kishan-manch.vercel.app', 'https://kisanando6056back.builtwithrocket.new'],
+  origin: ['https://api.rashtriyakisanmanch.com', 'http://localhost:4028', 'http://localhost:3000', 'https://rashtriya-kishan-manch.vercel.app', 'https://kisanando6056back.builtwithrocket.new', '*'], // Allow any origin temporarily for debugging
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
+// Add a pre-flight response for all routes
+app.options('*', cors());
 
 // Add a specific route to handle the log-error endpoint from the external domain
 app.options('/log-error', cors());
@@ -47,9 +56,11 @@ const timelineRoutes = require('./routes/timelineRoutes');
 const aboutRoutes = require('./routes/aboutRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
 const partnerInquiryRoutes = require('./routes/partnerInquiryRoutes');
+const nominationRoutes = require('./routes/nominationRoutes');
 
 // Import middleware
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const { handleUploadErrors } = require('./middleware/uploadMiddleware');
 
 // Serve static files from the 'public' directory
 // This will make files in 'public/uploads' accessible via /uploads/filename.ext
@@ -79,11 +90,15 @@ app.use('/api/timeline', timelineRoutes);
 app.use('/api/about', aboutRoutes);
 app.use('/api/banner', bannerRoutes);
 app.use('/api/partnership-inquiries', partnerInquiryRoutes);
+app.use('/api/nominations', nominationRoutes);
 // app.use('/api/admin', require('./routes/adminRoutes')); // Placeholder for specific admin panel routes if needed beyond CRUD
 
 app.get('/getKey', (req, res) => {
   res.json(process.env.RAZORPAY_KEY_ID)
 })
+
+// Add multer error handler middleware before other error handlers
+app.use(handleUploadErrors);
 
 // Custom error handling middleware
 app.use(notFound);
@@ -93,4 +108,6 @@ const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`API base URL: http://localhost:${PORT}`);
+  console.log(`Nominations endpoint: http://localhost:${PORT}/api/nominations`);
 });

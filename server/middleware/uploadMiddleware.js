@@ -27,15 +27,17 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit (more reasonable for web uploads)
   },
   fileFilter: (req, file, cb) => {
+    console.log("Processing file upload:", file.originalname, file.mimetype);
+    
     // Check file type
-    const filetypes = /jpeg|jpg|png|gif|webp/;
+    const filetypes = /jpeg|jpg|png|gif|webp|pdf|mp4|quicktime|mpeg|x-msvideo/;
     const mimetype = filetypes.test(file.mimetype);
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
 
     if (mimetype && extname) {
       return cb(null, true);
     }
-    cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed'));
+    cb(new Error(`Unsupported file type: ${file.mimetype}. Only image files (jpeg, jpg, png, gif, webp), PDF files and videos (mp4, mov) are allowed`));
   }
 });
 
@@ -86,12 +88,41 @@ const uploadMultiple = (fieldNames) => {
 };
 
 // Middleware for multiple fields with different names (used for main file + thumbnail)
-const uploadFields = (fields) => upload.fields(fields);
+const uploadFields = (fields) => {
+  console.log("Configuring uploadFields with:", JSON.stringify(fields));
+  
+  if (!Array.isArray(fields)) {
+    throw new Error('Fields must be an array of objects with name and maxCount');
+  }
+  
+  // Add nomination-specific fields if they aren't explicitly defined
+  const hasAadharField = fields.some(field => field.name === 'aadharCard');
+  const hasPhotographField = fields.some(field => field.name === 'photograph');
+  const hasAdditionalDocField = fields.some(field => field.name === 'additionalDocument');
+  
+  const allFields = [...fields];
+  
+  if (!hasAadharField) {
+    allFields.push({ name: 'aadharCard', maxCount: 1 });
+  }
+  
+  if (!hasPhotographField) {
+    allFields.push({ name: 'photograph', maxCount: 1 });
+  }
+  
+  if (!hasAdditionalDocField) {
+    allFields.push({ name: 'additionalDocument', maxCount: 1 });
+  }
+  
+  console.log("Final upload fields configuration:", JSON.stringify(allFields));
+  
+  return upload.fields(allFields);
+};
 
 // Middleware to process Cloudinary uploads properly
 const processCloudinaryUploads = (req, res, next) => {
   // Fields we expect to contain file uploads
-  const fileFields = ['gallery', 'mediafile', 'thumbnail', 'coverImage', 'image', 'photo', 'video'];
+  const fileFields = ['gallery', 'mediafile', 'thumbnail', 'coverImage', 'image', 'photo', 'video', 'aadharCard', 'photograph', 'additionalDocument'];
 
   console.log('processCloudinaryUploads middleware called');
 
@@ -146,12 +177,16 @@ const processCloudinaryUploads = (req, res, next) => {
         });
       }
     });
+  } else {
+    console.log('No files received in request');
   }
   next();
 };
 
 // Custom error handler for Multer errors
 const handleUploadErrors = (err, req, res, next) => {
+  console.error('Upload error:', err);
+  
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ 

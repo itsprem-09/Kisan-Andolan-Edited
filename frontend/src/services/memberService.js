@@ -202,14 +202,50 @@ const memberService = {
   // Admin functions - get all member applications
   getMemberApplications: async (token) => {
     try {
-      const response = await axios.get(baseURL, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.data;
+      try {
+        const response = await axios.get(baseURL, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
+        // Check if we have valid data
+        if (response.data && Array.isArray(response.data)) {
+          return response.data;
+        } else if (response.data && Array.isArray(response.data.members)) {
+          return response.data.members;
+        } else if (response.data) {
+          console.warn('Unexpected data format received from member API:', response.data);
+          return [];
+        }
+        
+        return [];
+      } catch (localError) {
+        console.log("Local API not available, trying production API...");
+        try {
+          // If local API fails, try the production API
+          const prodResponse = await axios.get(fallbackURL, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          
+          if (prodResponse.data && Array.isArray(prodResponse.data)) {
+            return prodResponse.data;
+          } else if (prodResponse.data && Array.isArray(prodResponse.data.members)) {
+            return prodResponse.data.members;
+          }
+          
+          return [];
+        } catch (prodError) {
+          console.warn("Production API also not available, returning empty array");
+          return [];
+        }
+      }
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Error fetching member applications');
+      console.error('Error in getMemberApplications:', error);
+      // Rather than throw an error, return empty array
+      return [];
     }
   },
 
@@ -245,6 +281,349 @@ const memberService = {
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Error deleting member');
+    }
+  },
+
+  // Admin functions - download individual member PDF
+  downloadMemberPdf: async (memberId, token) => {
+    try {
+      // Get the member data first
+      const response = await axios.get(`${baseURL}/${memberId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.data || !response.data.member) {
+        throw new Error('Failed to retrieve member data');
+      }
+      
+      // Then generate and download the PDF
+      return await memberService.downloadApplicationReceipt(response.data.member);
+    } catch (error) {
+      console.error('Error downloading member PDF:', error);
+      throw error;
+    }
+  },
+
+  // Admin functions - export all members to Excel
+  exportMembersToExcel: async (filters = {}, token) => {
+    try {
+      // Prepare query parameters
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.membershipType) queryParams.append('membershipType', filters.membershipType);
+      
+      // Format dates to ISO string format (YYYY-MM-DD)
+      if (filters.startDate) {
+        const formattedStartDate = filters.startDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('startDate', formattedStartDate);
+      }
+      if (filters.endDate) {
+        const formattedEndDate = filters.endDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('endDate', formattedEndDate);
+      }
+      
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      console.log('Excel export query string:', queryString);
+      
+      // Make the request with blob response type for direct download
+      const response = await axios.get(`${pdfURL}/export-members-excel${queryString}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        responseType: 'blob'
+      });
+      
+      // Create a download link and trigger the download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `members_export_${Date.now()}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      return true;
+    } catch (error) {
+      console.error('Error exporting members to Excel:', error);
+      throw error;
+    }
+  },
+
+  // Admin functions - export selected members to Excel
+  exportSelectedMembersToExcel: async (memberIds = [], token) => {
+    try {
+      if (!memberIds.length) {
+        throw new Error('No members selected for export');
+      }
+      
+      // Make the request with blob response type for direct download
+      const response = await axios.post(
+        `${pdfURL}/export-selected-members-excel`,
+        { memberIds },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          responseType: 'blob'
+        }
+      );
+      
+      // Create a download link and trigger the download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `selected_members_export_${Date.now()}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      return true;
+    } catch (error) {
+      console.error('Error exporting selected members to Excel:', error);
+      throw error;
+    }
+  },
+
+  // Admin functions - export all youth program applications to Excel
+  exportYouthToExcel: async (filters = {}, token) => {
+    try {
+      // Prepare query parameters
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append('status', filters.status);
+      
+      // Format dates to ISO string format (YYYY-MM-DD)
+      if (filters.startDate) {
+        const formattedStartDate = filters.startDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('startDate', formattedStartDate);
+      }
+      if (filters.endDate) {
+        const formattedEndDate = filters.endDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('endDate', formattedEndDate);
+      }
+      
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      console.log('Youth Excel export query:', queryString);
+      
+      // Make the request with blob response type for direct download
+      const response = await axios.get(`${pdfURL}/export-youth-excel${queryString}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        responseType: 'blob'
+      });
+      
+      // Create a download link and trigger the download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `youth_program_export_${Date.now()}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      return true;
+    } catch (error) {
+      console.error('Error exporting youth applications to Excel:', error);
+      throw error;
+    }
+  },
+
+  // Admin functions - export all members to PDF
+  exportMembersToPdf: async (filters = {}, token) => {
+    try {
+      // Prepare query parameters
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.membershipType) queryParams.append('membershipType', filters.membershipType);
+      
+      // Format dates to ISO string format (YYYY-MM-DD)
+      if (filters.startDate) {
+        const formattedStartDate = filters.startDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('startDate', formattedStartDate);
+      }
+      if (filters.endDate) {
+        const formattedEndDate = filters.endDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('endDate', formattedEndDate);
+      }
+      
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      console.log('PDF export query string:', queryString);
+      
+      // Make the request with blob response type for direct download
+      const response = await axios.get(`${pdfURL}/export-members-pdf${queryString}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        responseType: 'blob'
+      });
+      
+      // Create a download link and trigger the download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `members_export_${Date.now()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      return true;
+    } catch (error) {
+      console.error('Error exporting members to PDF:', error);
+      throw error;
+    }
+  },
+
+  // Admin functions - export selected members to PDF
+  exportSelectedMembersToPdf: async (memberIds = [], token) => {
+    try {
+      if (!memberIds.length) {
+        throw new Error('No members selected for export');
+      }
+      
+      // Make the request with blob response type for direct download
+      const response = await axios.post(
+        `${pdfURL}/export-selected-members-pdf`,
+        { memberIds },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          responseType: 'blob'
+        }
+      );
+      
+      // Create a download link and trigger the download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `selected_members_export_${Date.now()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      return true;
+    } catch (error) {
+      console.error('Error exporting selected members to PDF:', error);
+      throw error;
+    }
+  },
+
+  // Admin functions - export all youth program applications to PDF
+  exportYouthToPdf: async (filters = {}, token) => {
+    try {
+      // Prepare query parameters
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append('status', filters.status);
+      
+      // Format dates to ISO string format (YYYY-MM-DD)
+      if (filters.startDate) {
+        const formattedStartDate = filters.startDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('startDate', formattedStartDate);
+      }
+      if (filters.endDate) {
+        const formattedEndDate = filters.endDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('endDate', formattedEndDate);
+      }
+      
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      console.log('Youth PDF export query:', queryString);
+      
+      // Make the request with blob response type for direct download
+      const response = await axios.get(`${pdfURL}/export-youth-pdf${queryString}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        responseType: 'blob'
+      });
+      
+      // Create a download link and trigger the download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `youth_program_export_${Date.now()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      return true;
+    } catch (error) {
+      console.error('Error exporting youth applications to PDF:', error);
+      throw error;
+    }
+  },
+  
+  // Check if there are any filtered members before exporting
+  checkFilteredMembers: async (filters = {}, token) => {
+    try {
+      // Prepare query parameters
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.membershipType) queryParams.append('membershipType', filters.membershipType);
+      
+      // Format dates to ISO string format (YYYY-MM-DD)
+      if (filters.startDate) {
+        const formattedStartDate = filters.startDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('startDate', formattedStartDate);
+      }
+      if (filters.endDate) {
+        const formattedEndDate = filters.endDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('endDate', formattedEndDate);
+      }
+      
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      
+      // Make a request to check if there are any members matching the filter criteria
+      const response = await axios.get(`${baseURL}/filtered-count${queryString}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      return response.data?.count > 0;
+    } catch (error) {
+      console.error('Error checking filtered members:', error);
+      // Return false instead of throwing an error
+      return false;
+    }
+  },
+  
+  // Check if there are any filtered youth applications before exporting
+  checkFilteredYouth: async (filters = {}, token) => {
+    try {
+      // Prepare query parameters
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append('status', filters.status);
+      
+      // Format dates to ISO string format (YYYY-MM-DD)
+      if (filters.startDate) {
+        const formattedStartDate = filters.startDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('startDate', formattedStartDate);
+      }
+      if (filters.endDate) {
+        const formattedEndDate = filters.endDate.split('T')[0]; // Extract just the YYYY-MM-DD part
+        queryParams.append('endDate', formattedEndDate);
+      }
+      
+      queryParams.append('membershipType', 'Kisan Youth Leadership Program');
+      
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      
+      // Make a request to check if there are any youth applications matching the filter criteria
+      const response = await axios.get(`${baseURL}/filtered-count${queryString}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      return response.data?.count > 0;
+    } catch (error) {
+      console.error('Error checking filtered youth applications:', error);
+      // Return false instead of throwing an error
+      return false;
     }
   }
 };

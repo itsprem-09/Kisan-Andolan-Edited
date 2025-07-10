@@ -21,7 +21,7 @@ const variants = {
   })
 };
 
-const HeroSection = ({ onMemberRegistration, onYouthLeadership }) => {
+const HeroSection = ({ onMemberRegistration, onYouthLeadership, onNominationForm }) => {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [banners, setBanners] = useState([]);
@@ -66,6 +66,29 @@ const HeroSection = ({ onMemberRegistration, onYouthLeadership }) => {
             />
           )}
         </AnimatePresence>
+
+        <div className="absolute bottom-10 left-0 right-0 flex justify-center space-x-4 px-4">
+          <button
+            onClick={onMemberRegistration}
+            className="bg-primary hover:bg-primary-dark text-white py-3 px-6 rounded-lg font-medium transition-colors"
+          >
+            <TranslateText translationKey="becomeMember">Become a Member</TranslateText>
+          </button>
+          
+          <button
+            onClick={onYouthLeadership}
+            className="bg-secondary hover:bg-secondary-dark text-white py-3 px-6 rounded-lg font-medium transition-colors"
+          >
+            <TranslateText translationKey="youthLeadership">Youth Leadership Program</TranslateText>
+          </button>
+          
+          <button
+            onClick={onNominationForm}
+            className="bg-accent-orange hover:bg-orange-600 text-white py-3 px-6 rounded-lg font-medium transition-colors"
+          >
+            <TranslateText translationKey="nominateHero">Nominate for Kisan Puraskar</TranslateText>
+          </button>
+        </div>
       </section>
     </div>
   );
